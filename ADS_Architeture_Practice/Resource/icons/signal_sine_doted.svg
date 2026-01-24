@@ -1,0 +1,13 @@
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M0 8 H5" 
+        stroke="#999999" 
+        stroke-width="1" 
+        stroke-dasharray="1,1" 
+        shape-rendering="crispEdges"/>
+
+  <path d="M5 8 C6.5 4 8 4 9.5 8 C11 12 12.5 12 14 8" 
+        stroke="#FF8C00" 
+        stroke-width="2" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"/>
+</svg>

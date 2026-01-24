@@ -1,41 +1,57 @@
-# Prerequisites
-*.d
+# ----------------------------------------
+# Qt Creator / CMake user-specific files
+# ----------------------------------------
+CMakeLists.txt.user
+CMakeLists.txt.user.*
 
-# Compiled Object files
+# ----------------------------------------
+# Build directories
+# ----------------------------------------
+build/
+build-*/
+cmake-build-*/
+debug/
+release/
+x64/
+
+# ----------------------------------------
+# Windows artifacts
+# ----------------------------------------
+Thumbs.db
+Desktop.ini
+
+# ----------------------------------------
+# Backup / temp files
+# ----------------------------------------
+*~
+*.bak
+*.swp
+
+# C++ objects and libs
 *.slo
 *.lo
 *.o
 *.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Linker files
-*.ilk
-
-# Debugger Files
-*.pdb
-
-# Compiled Dynamic libraries
 *.so
-*.dylib
 *.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
+*.dylib
 *.exe
-*.out
-*.app
+*.lib
+*.a
 
-# debug information files
-*.dwo
+# Qt specific
+Makefile*
+*.qmake.stash
+*.qrc_*.cpp
+*.ui_*.h
+moc_*.cpp
+ui_*.h
+.qmake.cache
+.qmake.stash
+
+# ----------------------------------------
+# Qt Creator autosave / temp
+# ----------------------------------------
+*.pro.user
+*.pro.user.*
+*.autosave
