@@ -1,0 +1,369 @@
+
+==================================================
+FILE: .\src\appdockmanager.cpp
+==================================================
+#include "appdockmanager.h"
+#include <QLabel>
+#include <QTextEdit>
+#include <QSettings>
+
+AppDockManager::AppDockManager(QObject *parent): QObject{parent}
+{
+    QWidget* parentWidget = qobject_cast<QWidget*>(parent);
+    m_adsManager = new ads::CDockManager(parentWidget);
+
+}
+
+ads::CDockManager* AppDockManager::dockManager() const
+{
+    return m_adsManager;
+}
+
+void AppDockManager::createProjectDock()
+{
+    auto* widget = new QLabel("Project Explorer");
+
+    auto* dock = new ads::CDockWidget("Project");
+    dock->setObjectName("dock.project");
+    dock->setWidget(widget);
+
+    m_adsManager->addDockWidget(ads::LeftDockWidgetArea, dock);
+    dock->closeDockWidget(); // start closed
+    m_docks.insert(dock->objectName(), dock);
+    connect(dock, &ads::CDockWidget::visibilityChanged,
+            this, [this](bool visible) {
+                if (visible)
+                    emit dockActivated();
+            });
+}
+
+void AppDockManager::createCanMessagesDock()
+{
+    auto* widget = new QLabel("CAN Messages View");
+    widget->setAlignment(Qt::AlignCenter);
+
+    auto* dock = new ads::CDockWidget("CAN Messages");
+    dock->setObjectName("dock.can_messages");
+    dock->setWidget(widget);
+
+    m_adsManager->addDockWidget(ads::CenterDockWidgetArea, dock );
+    dock->closeDockWidget();
+    m_docks.insert(dock->objectName(), dock);
+    connect(dock, &ads::CDockWidget::visibilityChanged,
+            this, [this](bool visible) {
+                if (visible)
+                    emit dockActivated();
+            });
+}
+
+void AppDockManager::createPropertiesPanelDock()
+{
+    auto* widget = new QLabel("Properties Panel");
+    widget->setAlignment(Qt::AlignCenter);
+
+    auto* dock = new ads::CDockWidget("Properties");
+    dock->setObjectName("dock.properties");
+    dock->setWidget(widget);
+
+    m_adsManager->addDockWidget(ads::DockWidgetArea::RightDockWidgetArea, dock);
+    dock->closeDockWidget();
+    m_docks.insert(dock->objectName(), dock);
+    connect(dock, &ads::CDockWidget::visibilityChanged,
+            this, [this](bool visible) {
+                if (visible)
+                    emit dockActivated();
+            });
+}
+
+
+void AppDockManager::createLogDock()
+{
+    auto* widget = new QLabel("Log Output");
+
+    auto* dock = new ads::CDockWidget("Log");
+    dock->setObjectName("dock.log");
+    dock->setWidget(widget);
+
+    m_adsManager->addDockWidget(ads::BottomDockWidgetArea, dock );
+    dock->closeDockWidget();
+    m_docks.insert(dock->objectName(), dock);
+    connect(dock, &ads::CDockWidget::visibilityChanged,
+            this, [this](bool visible) {
+                if (visible)
+                    emit dockActivated();
+            });
+}
+
+QList<QAction*> AppDockManager::viewMenuActions()
+{
+    QList<QAction*> actions;
+
+    for (ads::CDockWidget* dock : m_docks)
+    {
+        QAction* action = dock->toggleViewAction();
+        action->setText(dock->windowTitle());
+        actions.append(action);
+    }
+
+    return actions;
+}
+
+bool AppDockManager::hasSavedLayout() const
+{
+    QSettings settings("SPYDER", "AutoTraceTool");
+    return settings.contains("layout/main");
+}
+
+void AppDockManager::saveLayout()
+{
+    QByteArray state = m_adsManager->saveState();
+    qDebug() << "Saving layout, bytes:" << state.size();
+
+    if (state.isEmpty())
+        return;
+
+    QSettings settings("SPYDER", "AutoTraceTool");
+    settings.setValue("layout/main", m_adsManager->saveState());
+}
+
+void AppDockManager::restoreLayout()
+{
+    qDebug() << "Restoring layout, docks known:" << m_docks.keys();
+    QSettings settings("YourCompany", "SPYDER");
+
+    if (!settings.contains("layout/main"))
+        return;
+
+    QByteArray state = settings.value("layout/main").toByteArray();
+    m_adsManager->restoreState(state);
+}
+
+==================================================
+FILE: .\src\appdockmanager.h
+==================================================
+#pragma once
+
+#include <QObject>
+#include <DockManager.h>
+#include <QMap>
+
+namespace ads { class CDockWidget; }
+
+class AppDockManager : public QObject
+{
+    Q_OBJECT
+public:
+    explicit AppDockManager(QObject* parent = nullptr);
+
+    ads::CDockManager* dockManager() const;
+    void createProjectDock();
+    void createCanMessagesDock();
+    void createPropertiesPanelDock();
+    void createLogDock();
+    QList<QAction*> viewMenuActions();
+
+    // const QMap<QString, ads::CDockWidget*>& docks() const { return m_docks; }
+
+    void saveLayout();
+    void restoreLayout();
+    bool hasSavedLayout() const;
+
+signals:
+    void dockActivated();
+
+private:
+    ads::CDockManager* m_adsManager = nullptr;
+    QMap<QString, ads::CDockWidget*> m_docks;
+
+};
+
+==================================================
+FILE: .\src\main.cpp
+==================================================
+#include <QApplication>
+#include "mainwindow.h"
+
+int main(int argc, char *argv[])
+{
+    QApplication app(argc, argv);
+
+    MainWindow window;
+    window.resize(1200, 800);
+    window.show();
+
+    return app.exec();
+}
+
+==================================================
+FILE: .\src\mainwindow.cpp
+==================================================
+#include "mainwindow.h"
+#include <QDebug>
+#include <DockManager.h>
+#include <QLabel>
+#include <QTextEdit>
+#include <QMenuBar>
+#include <QSettings>
+#include <QCloseEvent>
+#include <QLabel>
+#include <QVBoxLayout>
+#include <QPushButton>
+#include "appdockmanager.h"
+
+MainWindow::MainWindow(QWidget *parent): QMainWindow(parent)
+{
+    /* --- 1. SETUP Window tittle and Icon ---*/
+    QString version = "1.0.0";
+    setWindowTitle("SPYDER AutoTraceTool " + version);
+
+    QIcon winIcon(":/ICONS/Resource/icons/app_icon.svg");
+    winIcon.addFile(":/ICONS/Resource/icons/app_icon_square.svg");
+    setWindowIcon(winIcon);
+
+    DockCreation();
+
+    createViewMenu();
+    createHelpMenu();
+
+    connect(m_appDockManager, &AppDockManager::dockActivated,
+            this, &MainWindow::showDockLayout);
+
+
+    if (m_appDockManager->hasSavedLayout())
+    {
+        showDockLayout();
+        m_appDockManager->restoreLayout();
+    }
+    else
+    {
+        showWelcomePage();
+    }
+}
+
+MainWindow::~MainWindow() {
+    qDebug() << " Program ended";
+}
+
+void MainWindow:: DockCreation()
+{
+    m_centralStack = new QStackedWidget(this);
+    setCentralWidget(m_centralStack);
+
+    m_appDockManager = new AppDockManager(m_centralStack);
+    m_centralStack->addWidget(m_appDockManager->dockManager());
+
+
+    // Create welcome page
+    createWelcomePage();
+
+    /* QStackedWidget
+     ├─ index 0 → Welcome page
+     └─ index 1 → ADS DockManager */
+    m_centralStack->insertWidget(0, m_welcomePage);
+
+    m_appDockManager->createProjectDock();
+    m_appDockManager->createPropertiesPanelDock();
+    m_appDockManager->createCanMessagesDock();
+    m_appDockManager->createLogDock();
+
+
+}
+
+void MainWindow::createViewMenu()
+{
+    m_viewMenu = menuBar()->addMenu(tr("&View"));
+
+    for (QAction* action : m_appDockManager->viewMenuActions())
+    {
+        m_viewMenu->addAction(action);
+    }
+}
+
+void MainWindow::closeEvent(QCloseEvent* event)
+{
+    m_appDockManager->saveLayout();
+    QMainWindow::closeEvent(event);
+}
+
+void MainWindow::createHelpMenu()
+{
+    QMenu* helpMenu = menuBar()->addMenu(tr("&Help"));
+
+    QAction* aboutAction = helpMenu->addAction(tr("About SPYDER"));
+    connect(aboutAction, &QAction::triggered, this, [this](){
+        // Simple placeholder for an About dialog
+        qDebug() << "About clicked";
+    });
+}
+
+void MainWindow::createWelcomePage()
+{
+    m_welcomePage = new QWidget(this);
+
+    auto* layout = new QVBoxLayout(m_welcomePage);
+    layout->setAlignment(Qt::AlignCenter);
+
+    auto* title = new QLabel("Welcome to SPYDER");
+    title->setStyleSheet("font-size: 24px; font-weight: bold;");
+
+    auto* subtitle = new QLabel("Open a tool to get started");
+    subtitle->setStyleSheet("color: gray;");
+
+    auto* hint = new QLabel("Use View menu to open panels");
+
+    layout->addWidget(title);
+    layout->addSpacing(10);
+    layout->addWidget(subtitle);
+    layout->addSpacing(20);
+    layout->addWidget(hint);
+}
+
+void MainWindow::showWelcomePage()
+{
+    m_centralStack->setCurrentWidget(m_welcomePage);
+}
+
+void MainWindow::showDockLayout()
+{
+    m_centralStack->setCurrentWidget(m_appDockManager->dockManager());
+}
+
+==================================================
+FILE: .\src\mainwindow.h
+==================================================
+#pragma once
+
+#include <QMainWindow>
+#include <QMap>
+#include <QStackedWidget>
+
+class AppDockManager;
+
+class MainWindow : public QMainWindow
+{
+    Q_OBJECT
+
+public:
+    explicit MainWindow(QWidget *parent = nullptr);
+    ~MainWindow();
+
+protected:
+    void closeEvent(QCloseEvent* event) override;
+
+private:
+    QMenu* m_viewMenu = nullptr;
+    QMap<QString, QAction*> m_dockActions;
+
+    QStackedWidget* m_centralStack = nullptr;
+    QWidget* m_welcomePage = nullptr;
+
+    AppDockManager* m_appDockManager = nullptr;
+
+    void DockCreation(void);
+    void createViewMenu();
+    void createWelcomePage();
+    void showWelcomePage();
+    void showDockLayout();
+    void createHelpMenu();
+};
+
