@@ -4,10 +4,7 @@
 #include <QMap>
 #include <QStackedWidget>
 
-namespace ads {
-class CDockManager;
-class CDockWidget;
-}
+class AppDockManager;
 
 class MainWindow : public QMainWindow
 {
@@ -18,29 +15,28 @@ public:
     ~MainWindow();
 
 protected:
-    void closeEvent(QCloseEvent* event) override;
+    void closeEvent(QCloseEvent *event) override;
+
+private slots:
+    void onFirstDockOpened();
 
 private:
-    ads::CDockManager* m_dockManager = nullptr;
-    QMap<QString, ads::CDockWidget*> m_docks;
-    QMenu* m_viewMenu = nullptr;
-    QMap<QString, QAction*> m_dockActions;
-    QMap<QString, QByteArray> m_workspaces;
+    // UI Components
+    QMenu *m_viewMenu = nullptr;
+    QStackedWidget *m_centralStack = nullptr;
+    QWidget *m_welcomePage = nullptr;
 
-    QStackedWidget* m_centralStack = nullptr;
-    QWidget* m_welcomePage = nullptr;
+    // Dock Management
+    AppDockManager *m_appDockManager = nullptr;
 
-    void registerDock(ads::CDockWidget* dock);
-    void DockCreation(void);
-
+    // Initialization methods
+    void initializeDockSystem();
+    void createMenus();
     void createViewMenu();
-    void saveLayout();
-    bool hasAnyDockVisible() const;
-    void restoreLayout();
-
+    void createHelpMenu();
     void createWelcomePage();
+
+    // View switching
     void showWelcomePage();
     void showDockLayout();
-    void createHelpMenu();
 };
-

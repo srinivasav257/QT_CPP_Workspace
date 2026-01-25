@@ -3,7 +3,7 @@ import os
 # Files to include
 EXTENSIONS = {'.h', '.cpp', '.ui', '.pro', '.pri', 'CMakeLists.txt'}
 # Folders to completely ignore
-IGNORE_DIRS = {'build', 'release', 'debug', '.git', '.vs', 'Resource'}
+IGNORE_DIRS = {'build', 'release', 'debug', '.git', '.vs', 'Resource', 'third_party', 'qtads'}
 
 output_file = "full_project_code.txt"
 
