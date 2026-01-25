@@ -3,12 +3,18 @@
 #include <DockManager.h>
 #include <QLabel>
 #include <QTextEdit>
+#include <QMenuBar>
+#include <QSettings>
+#include <QCloseEvent>
+#include <QLabel>
+#include <QVBoxLayout>
+#include <QPushButton>
 
 MainWindow::MainWindow(QWidget *parent): QMainWindow(parent)
 {
-    // --- 1. SETUP Window tittle and Icon ---
+    /* --- 1. SETUP Window tittle and Icon ---*/
     QString version = "1.0.0";
-    setWindowTitle("SPYDER " + version);
+    setWindowTitle("SPYDER AutoTraceTool " + version);
 
     QIcon winIcon(":/ICONS/Resource/icons/app_icon.svg");
     winIcon.addFile(":/ICONS/Resource/icons/app_icon_square.svg");
@@ -16,10 +22,20 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent)
 
     DockCreation();
 
-    Q_ASSERT(m_docks.contains("dock.project"));
-    Q_ASSERT(m_docks.contains("dock.can_messages"));
-    Q_ASSERT(m_docks.contains("dock.properties"));
-    Q_ASSERT(m_docks.contains("dock.log"));
+    createViewMenu();
+    createHelpMenu();
+
+    QSettings settings("SPYDER", "AutoTraceTool");
+
+    if (settings.contains("layout/main"))
+    {
+        restoreLayout();
+        showDockLayout();
+    }
+    else
+    {
+        showWelcomePage();
+    }
 }
 
 MainWindow::~MainWindow() {
@@ -28,8 +44,20 @@ MainWindow::~MainWindow() {
 
 void MainWindow:: DockCreation()
 {
-    m_dockManager = new ads::CDockManager(this);
-    setCentralWidget(m_dockManager);
+    m_centralStack = new QStackedWidget(this);
+    setCentralWidget(m_centralStack);
+
+    m_dockManager = new ads::CDockManager(m_centralStack);
+    // setCentralWidget(m_dockManager);
+    m_centralStack->addWidget(m_dockManager);
+
+    // Create welcome page
+    createWelcomePage();
+
+    /* QStackedWidget
+     ├─ index 0 → Welcome page
+     └─ index 1 → ADS DockManager */
+    m_centralStack->insertWidget(0, m_welcomePage);
 
     // ---------- Left Dock ----------
     auto* projectLabel = new QLabel("Project Explorer");
@@ -39,6 +67,7 @@ void MainWindow:: DockCreation()
     projectDock->setObjectName("dock.project");
     projectDock->setWidget(projectLabel);
     m_dockManager->addDockWidget(ads::DockWidgetArea::LeftDockWidgetArea, projectDock);
+    projectDock->closeDockWidget();
     registerDock(projectDock);
 
     // ---------- Center Dock ----------
@@ -50,6 +79,7 @@ void MainWindow:: DockCreation()
     centerDock->setObjectName("dock.can_messages");
     centerDock->setWidget(centerText);
     m_dockManager->addDockWidget(ads::DockWidgetArea::CenterDockWidgetArea, centerDock);
+    centerDock->closeDockWidget();
     registerDock(centerDock);
 
     // ---------- Right Dock ----------
@@ -60,6 +90,7 @@ void MainWindow:: DockCreation()
     propertiesDock->setObjectName("dock.properties");
     propertiesDock->setWidget(propertiesLabel);
     m_dockManager->addDockWidget(ads::DockWidgetArea::RightDockWidgetArea, propertiesDock);
+    propertiesDock->closeDockWidget();
     registerDock(propertiesDock);
 
     // ---------- Bottom Dock ----------
@@ -72,6 +103,7 @@ void MainWindow:: DockCreation()
     logDock->setObjectName("dock.log");
     logDock->setWidget(logText);
     m_dockManager->addDockWidget(ads::DockWidgetArea::BottomDockWidgetArea, logDock);
+    logDock->closeDockWidget();
     registerDock(logDock);
 }
 
@@ -86,4 +118,96 @@ void MainWindow::registerDock(ads::CDockWidget* dock)
     {
         qDebug() << "Invalid Dock ";
     }
+}
+
+void MainWindow::createViewMenu()
+{
+    m_viewMenu = menuBar()->addMenu(tr("&View"));
+
+    for (ads::CDockWidget* dock : m_docks)
+    {
+        qDebug() << "Menubar Docke ID: " << dock;
+        QAction* action = dock->toggleViewAction();
+        action->setText(dock->windowTitle());
+        m_viewMenu->addAction(action);
+        connect(action, &QAction::triggered,this, &MainWindow::showDockLayout);
+    }
+}
+
+void MainWindow::saveLayout()
+{
+    if (!hasAnyDockVisible())
+        return;
+    QSettings settings("SPYDER", "AutoTraceTool");
+    settings.setValue("layout/main", m_dockManager->saveState());
+}
+
+bool MainWindow::hasAnyDockVisible() const
+{
+    for (ads::CDockWidget* dock : m_docks)
+    {
+        if (dock->isVisible())
+            return true;
+    }
+    return false;
+}
+
+void MainWindow::restoreLayout()
+{
+    QSettings settings("SPYDER", "AutoTraceTool");
+
+    if (settings.contains("layout/main"))
+    {
+        QByteArray layout = settings.value("layout/main").toByteArray();
+        m_dockManager->restoreState(layout);
+    }
+}
+
+void MainWindow::closeEvent(QCloseEvent* event)
+{
+    saveLayout();
+    QMainWindow::closeEvent(event);
+}
+
+void MainWindow::createHelpMenu()
+{
+    QMenu* helpMenu = menuBar()->addMenu(tr("&Help"));
+
+    QAction* aboutAction = helpMenu->addAction(tr("About SPYDER"));
+    connect(aboutAction, &QAction::triggered, this, [this](){
+        // Simple placeholder for an About dialog
+        qDebug() << "About clicked";
+    });
+}
+
+void MainWindow::createWelcomePage()
+{
+    m_welcomePage = new QWidget(this);
+
+    auto* layout = new QVBoxLayout(m_welcomePage);
+    layout->setAlignment(Qt::AlignCenter);
+
+    auto* title = new QLabel("Welcome to SPYDER");
+    title->setStyleSheet("font-size: 24px; font-weight: bold;");
+
+    auto* subtitle = new QLabel("Open a tool to get started");
+    subtitle->setStyleSheet("color: gray;");
+
+    auto* hint = new QLabel("Use View menu to open panels");
+
+    layout->addWidget(title);
+    layout->addSpacing(10);
+    layout->addWidget(subtitle);
+    layout->addSpacing(20);
+    layout->addWidget(hint);
+}
+
+void MainWindow::showWelcomePage()
+{
+    m_centralStack->setCurrentWidget(m_welcomePage);
+}
+
+void MainWindow::showDockLayout()
+{
+    m_centralStack->setCurrentWidget(m_dockManager);
 }

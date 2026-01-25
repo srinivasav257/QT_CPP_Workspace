@@ -1,0 +1,5933 @@
+
+==================================================
+FILE: .\src\main.cpp
+==================================================
+#include <QApplication>
+#include "mainwindow.h"
+
+int main(int argc, char *argv[])
+{
+    QApplication app(argc, argv);
+
+    MainWindow window;
+    window.resize(1200, 800);
+    window.show();
+
+    return app.exec();
+}
+
+==================================================
+FILE: .\src\mainwindow.cpp
+==================================================
+#include "mainwindow.h"
+#include <QDebug>
+#include <DockManager.h>
+#include <QLabel>
+#include <QTextEdit>
+#include <QMenuBar>
+#include <QSettings>
+#include <QCloseEvent>
+#include <QLabel>
+#include <QVBoxLayout>
+#include <QPushButton>
+
+MainWindow::MainWindow(QWidget *parent): QMainWindow(parent)
+{
+    /* --- 1. SETUP Window tittle and Icon ---*/
+    QString version = "1.0.0";
+    setWindowTitle("SPYDER AutoTraceTool " + version);
+
+    QIcon winIcon(":/ICONS/Resource/icons/app_icon.svg");
+    winIcon.addFile(":/ICONS/Resource/icons/app_icon_square.svg");
+    setWindowIcon(winIcon);
+
+    DockCreation();
+
+    createViewMenu();
+    createHelpMenu();
+
+    QSettings settings("SPYDER", "AutoTraceTool");
+
+    if (settings.contains("layout/main"))
+    {
+        restoreLayout();
+        showDockLayout();
+    }
+    else
+    {
+        showWelcomePage();
+    }
+}
+
+MainWindow::~MainWindow() {
+    qDebug() << " Program ended";
+}
+
+void MainWindow:: DockCreation()
+{
+    m_centralStack = new QStackedWidget(this);
+    setCentralWidget(m_centralStack);
+
+    m_dockManager = new ads::CDockManager(m_centralStack);
+    // setCentralWidget(m_dockManager);
+    m_centralStack->addWidget(m_dockManager);
+
+    // Create welcome page
+    createWelcomePage();
+
+    /* QStackedWidget
+     ├─ index 0 → Welcome page
+     └─ index 1 → ADS DockManager */
+    m_centralStack->insertWidget(0, m_welcomePage);
+
+    // ---------- Left Dock ----------
+    auto* projectLabel = new QLabel("Project Explorer");
+    projectLabel->setAlignment(Qt::AlignCenter);
+
+    auto* projectDock = new ads::CDockWidget("Project");
+    projectDock->setObjectName("dock.project");
+    projectDock->setWidget(projectLabel);
+    m_dockManager->addDockWidget(ads::DockWidgetArea::LeftDockWidgetArea, projectDock);
+    projectDock->closeDockWidget();
+    registerDock(projectDock);
+
+    // ---------- Center Dock ----------
+    auto* centerText = new QTextEdit();
+    centerText->setPlainText("CAN Messages View");
+    centerText->setAlignment(Qt::AlignCenter);
+
+    auto* centerDock = new ads::CDockWidget("CAN Messages");
+    centerDock->setObjectName("dock.can_messages");
+    centerDock->setWidget(centerText);
+    m_dockManager->addDockWidget(ads::DockWidgetArea::CenterDockWidgetArea, centerDock);
+    centerDock->closeDockWidget();
+    registerDock(centerDock);
+
+    // ---------- Right Dock ----------
+    auto* propertiesLabel = new QLabel("Properties Panel");
+    propertiesLabel->setAlignment(Qt::AlignCenter);
+
+    auto* propertiesDock = new ads::CDockWidget("Properties");
+    propertiesDock->setObjectName("dock.properties");
+    propertiesDock->setWidget(propertiesLabel);
+    m_dockManager->addDockWidget(ads::DockWidgetArea::RightDockWidgetArea, propertiesDock);
+    propertiesDock->closeDockWidget();
+    registerDock(propertiesDock);
+
+    // ---------- Bottom Dock ----------
+    auto* logText = new QTextEdit();
+    logText->setPlainText("Log Output");
+    logText->setAlignment(Qt::AlignCenter);
+
+
+    auto* logDock = new ads::CDockWidget("Log");
+    logDock->setObjectName("dock.log");
+    logDock->setWidget(logText);
+    m_dockManager->addDockWidget(ads::DockWidgetArea::BottomDockWidgetArea, logDock);
+    logDock->closeDockWidget();
+    registerDock(logDock);
+}
+
+void MainWindow::registerDock(ads::CDockWidget* dock)
+{
+    if(dock!=nullptr)
+    {
+        qDebug() << "The Dock ID: " << dock->objectName();
+        m_docks.insert(dock->objectName(), dock);
+    }
+    else
+    {
+        qDebug() << "Invalid Dock ";
+    }
+}
+
+void MainWindow::createViewMenu()
+{
+    m_viewMenu = menuBar()->addMenu(tr("&View"));
+
+    for (ads::CDockWidget* dock : m_docks)
+    {
+        qDebug() << "Menubar Docke ID: " << dock;
+        QAction* action = dock->toggleViewAction();
+        action->setText(dock->windowTitle());
+        m_viewMenu->addAction(action);
+        connect(action, &QAction::triggered,this, &MainWindow::showDockLayout);
+    }
+}
+
+void MainWindow::saveLayout()
+{
+    if (!hasAnyDockVisible())
+        return;
+    QSettings settings("SPYDER", "AutoTraceTool");
+    settings.setValue("layout/main", m_dockManager->saveState());
+}
+
+bool MainWindow::hasAnyDockVisible() const
+{
+    for (ads::CDockWidget* dock : m_docks)
+    {
+        if (dock->isVisible())
+            return true;
+    }
+    return false;
+}
+
+void MainWindow::restoreLayout()
+{
+    QSettings settings("SPYDER", "AutoTraceTool");
+
+    if (settings.contains("layout/main"))
+    {
+        QByteArray layout = settings.value("layout/main").toByteArray();
+        m_dockManager->restoreState(layout);
+    }
+}
+
+void MainWindow::closeEvent(QCloseEvent* event)
+{
+    saveLayout();
+    QMainWindow::closeEvent(event);
+}
+
+void MainWindow::createHelpMenu()
+{
+    QMenu* helpMenu = menuBar()->addMenu(tr("&Help"));
+
+    QAction* aboutAction = helpMenu->addAction(tr("About SPYDER"));
+    connect(aboutAction, &QAction::triggered, this, [this](){
+        // Simple placeholder for an About dialog
+        qDebug() << "About clicked";
+    });
+}
+
+void MainWindow::createWelcomePage()
+{
+    m_welcomePage = new QWidget(this);
+
+    auto* layout = new QVBoxLayout(m_welcomePage);
+    layout->setAlignment(Qt::AlignCenter);
+
+    auto* title = new QLabel("Welcome to SPYDER");
+    title->setStyleSheet("font-size: 24px; font-weight: bold;");
+
+    auto* subtitle = new QLabel("Open a tool to get started");
+    subtitle->setStyleSheet("color: gray;");
+
+    auto* hint = new QLabel("Use View menu to open panels");
+
+    layout->addWidget(title);
+    layout->addSpacing(10);
+    layout->addWidget(subtitle);
+    layout->addSpacing(20);
+    layout->addWidget(hint);
+}
+
+void MainWindow::showWelcomePage()
+{
+    m_centralStack->setCurrentWidget(m_welcomePage);
+}
+
+void MainWindow::showDockLayout()
+{
+    m_centralStack->setCurrentWidget(m_dockManager);
+}
+
+==================================================
+FILE: .\src\mainwindow.h
+==================================================
+#pragma once
+
+#include <QMainWindow>
+#include <QMap>
+#include <QStackedWidget>
+
+namespace ads {
+class CDockManager;
+class CDockWidget;
+}
+
+class MainWindow : public QMainWindow
+{
+    Q_OBJECT
+
+public:
+    explicit MainWindow(QWidget *parent = nullptr);
+    ~MainWindow();
+
+protected:
+    void closeEvent(QCloseEvent* event) override;
+
+private:
+    ads::CDockManager* m_dockManager = nullptr;
+    QMap<QString, ads::CDockWidget*> m_docks;
+    QMenu* m_viewMenu = nullptr;
+    QMap<QString, QAction*> m_dockActions;
+    QMap<QString, QByteArray> m_workspaces;
+
+    QStackedWidget* m_centralStack = nullptr;
+    QWidget* m_welcomePage = nullptr;
+
+    void registerDock(ads::CDockWidget* dock);
+    void DockCreation(void);
+
+    void createViewMenu();
+    void saveLayout();
+    bool hasAnyDockVisible() const;
+    void restoreLayout();
+
+    void createWelcomePage();
+    void showWelcomePage();
+    void showDockLayout();
+    void createHelpMenu();
+};
+
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\ads_globals.h
+==================================================
+#ifndef ads_globalsH
+#define ads_globalsH
+/*******************************************************************************
+** Qt Advanced Docking System
+** Copyright (C) 2017 Uwe Kindler
+** 
+** This library is free software; you can redistribute it and/or
+** modify it under the terms of the GNU Lesser General Public
+** License as published by the Free Software Foundation; either
+** version 2.1 of the License, or (at your option) any later version.
+** 
+** This library is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+** Lesser General Public License for more details.
+** 
+** You should have received a copy of the GNU Lesser General Public
+** License along with this library; If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+
+//============================================================================
+/// \file   ads_globals.h
+/// \author Uwe Kindler
+/// \date   24.02.2017
+/// \brief  Declaration of
+//============================================================================
+
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include <QPair>
+#include <QtCore/QtGlobal>
+#include <QPixmap>
+#include <QWidget>
+#include <QDebug>
+#include <QStyle>
+#include <QMouseEvent>
+
+#include <iostream>
+
+#if defined(Q_OS_UNIX) && !defined(Q_OS_MACOS)
+#include <xcb/xcb.h>
+#endif
+
+QT_FORWARD_DECLARE_CLASS(QAbstractButton)
+
+#ifndef ADS_STATIC
+#ifdef ADS_SHARED_EXPORT
+#define ADS_EXPORT Q_DECL_EXPORT
+#else
+#define ADS_EXPORT Q_DECL_IMPORT
+#endif
+#else
+#define ADS_EXPORT
+#endif
+
+// Define ADS_DEBUG_PRINT to enable a lot of debug output
+#ifdef ADS_DEBUG_PRINT
+#define ADS_PRINT(s) qDebug() << s
+#else
+#define ADS_PRINT(s)
+#endif
+
+// Set ADS_DEBUG_LEVEL to enable additional debug output and to enable layout
+// dumps to qDebug and std::cout after layout changes
+#define ADS_DEBUG_LEVEL 0
+
+QT_FORWARD_DECLARE_CLASS(QSplitter)
+
+namespace ads
+{
+Q_NAMESPACE
+class CDockSplitter;
+
+enum DockWidgetArea
+{
+	NoDockWidgetArea = 0x00,
+	LeftDockWidgetArea = 0x01,
+	RightDockWidgetArea = 0x02,
+	TopDockWidgetArea = 0x04,
+	BottomDockWidgetArea = 0x08,
+	CenterDockWidgetArea = 0x10,
+	LeftAutoHideArea = 0x20,
+	RightAutoHideArea = 0x40,
+	TopAutoHideArea = 0x80,
+	BottomAutoHideArea = 0x100,
+
+	InvalidDockWidgetArea = NoDockWidgetArea,
+	OuterDockAreas = TopDockWidgetArea | LeftDockWidgetArea | RightDockWidgetArea | BottomDockWidgetArea,
+	AutoHideDockAreas = LeftAutoHideArea | RightAutoHideArea | TopAutoHideArea | BottomAutoHideArea,
+	AllDockAreas = OuterDockAreas | CenterDockWidgetArea
+};
+Q_DECLARE_FLAGS(DockWidgetAreas, DockWidgetArea)
+
+
+enum eTabIndex
+{
+	TabDefaultInsertIndex = -1,
+	TabInvalidIndex = -2
+};
+
+
+enum TitleBarButton
+{
+	TitleBarButtonTabsMenu,
+	TitleBarButtonUndock,
+	TitleBarButtonClose,
+	TitleBarButtonAutoHide,
+	TitleBarButtonMinimize
+};
+
+/**
+ * The different dragging states
+ */
+enum eDragState
+{
+	DraggingInactive,     //!< DraggingInactive
+	DraggingMousePressed, //!< DraggingMousePressed
+	DraggingTab,          //!< DraggingTab
+	DraggingFloatingWidget//!< DraggingFloatingWidget
+};
+
+/**
+ * The different icons used in the UI
+ */
+enum eIcon
+{
+	TabCloseIcon,      //!< TabCloseIcon
+	AutoHideIcon,      //!< AutoHideIcon
+	DockAreaMenuIcon,  //!< DockAreaMenuIcon
+	DockAreaUndockIcon,//!< DockAreaUndockIcon
+	DockAreaCloseIcon, //!< DockAreaCloseIcon
+	DockAreaMinimizeIcon,
+
+	IconCount,         //!< just a delimiter for range checks
+};
+
+/**
+ * For bitwise combination of dock wdget features
+ */
+enum eBitwiseOperator
+{
+	BitwiseAnd,
+	BitwiseOr
+};
+
+
+/**
+ * Each dock container supports 4 sidebars
+ */
+enum SideBarLocation
+{
+	SideBarTop,
+	SideBarLeft,
+	SideBarRight,
+	SideBarBottom,
+	SideBarNone
+};
+Q_ENUMS(SideBarLocation)
+
+
+namespace internal
+{
+static const bool RestoreTesting = true;
+static const bool Restore = false;
+static const char* const ClosedProperty = "close";
+static const char* const DirtyProperty = "dirty";
+static const char* const LocationProperty = "Location";
+extern const int FloatingWidgetDragStartEvent;
+extern const int DockedWidgetDragStartEvent;
+
+#if defined(Q_OS_UNIX) && !defined(Q_OS_MACOS)
+// Utils to directly communicate with the X server
+/**
+ * Get atom from cache or request it from the XServer.
+ */
+xcb_atom_t xcb_get_atom(const char *name);
+
+/**
+ * Add a property to a window. Only works on "hidden" windows.
+ */
+void xcb_add_prop(bool state, WId window, const char *type, const char *prop);
+/**
+ * Updates up to two window properties. Can be set on a visible window.
+ */
+void xcb_update_prop(bool set, WId window, const char *type, const char *prop, const char *prop2 = nullptr);
+/**
+ * Only for debugging purposes.
+ */
+bool xcb_dump_props(WId window, const char *type);
+/**
+ * Gets the active window manager from the X11 Server.
+ * Requires a EWMH conform window manager (Almost all common used ones are).
+ * Returns "UNKNOWN" otherwise.
+ */
+QString windowManager();
+#endif
+
+/**
+ * Replace the from widget in the given splitter with the To widget
+ */
+void replaceSplitterWidget(QSplitter* Splitter, QWidget* From, QWidget* To);
+
+/**
+ * This function walks the splitter tree upwards to hides all splitters
+ * that do not have visible content
+ */
+void hideEmptyParentSplitters(CDockSplitter* FirstParentSplitter);
+
+
+/**
+ * Convenience class for QPair to provide better naming than first and
+ * second
+ */
+class CDockInsertParam : public QPair<Qt::Orientation, bool>
+{
+public:
+    using QPair<Qt::Orientation, bool>::QPair;
+	Qt::Orientation orientation() const {return this->first;}
+	bool append() const {return this->second;}
+	int insertOffset() const {return append() ? 1 : 0;}
+};
+
+/**
+ * Returns the insertion parameters for the given dock area
+ */
+CDockInsertParam dockAreaInsertParameters(DockWidgetArea Area);
+
+
+/**
+ * Returns the SieBarLocation for the AutoHide dock widget areas
+ */
+SideBarLocation toSideBarLocation(DockWidgetArea Area);
+
+
+/**
+ * Returns true for the top or bottom side bar and false for the
+ * left and right side bar
+ */
+bool isHorizontalSideBarLocation(SideBarLocation Location);
+
+
+/**
+ * Returns true, if the given dock area is a SideBar area
+ */
+bool isSideBarArea(DockWidgetArea Area);
+
+/**
+ * Searches for the parent widget of the given type.
+ * Returns the parent widget of the given widget or 0 if the widget is not
+ * child of any widget of type T
+ *
+ * It is not safe to use this function in in CDockWidget because only
+ * the current dock widget has a parent. All dock widgets that are not the
+ * current dock widget in a dock area have no parent.
+ */
+template <class T>
+T findParent(const QWidget* w)
+{
+	QWidget* parentWidget = w->parentWidget();
+	while (parentWidget)
+	{
+		T ParentImpl = qobject_cast<T>(parentWidget);
+		if (ParentImpl)
+		{
+			return ParentImpl;
+		}
+		parentWidget = parentWidget->parentWidget();
+	}
+	return nullptr;
+}
+
+/**
+ * Creates a semi transparent pixmap from the given pixmap Source.
+ * The Opacity parameter defines the opacity from completely transparent (0.0)
+ * to completely opaque (1.0)
+ */
+QPixmap createTransparentPixmap(const QPixmap& Source, qreal Opacity);
+
+
+/**
+ * Helper function for settings flags in a QFlags instance.
+ */
+template <class T>
+void setFlag(T& Flags, typename T::enum_type flag, bool on = true)
+{
+#if QT_VERSION >= 0x050700
+	Flags.setFlag(flag, on);
+#else
+    if(on)
+    {
+        Flags |= flag;
+    }
+    else
+    {
+        Flags &= ~flag;
+    }
+#endif
+}
+
+
+/**
+ * Helper function for settings tooltips without cluttering the code with
+ * tests for preprocessor macros
+ */
+template <class QObjectPtr>
+void setToolTip(QObjectPtr obj, const QString &tip)
+{
+#ifndef QT_NO_TOOLTIP
+	obj->setToolTip(tip);
+#else
+	Q_UNUSED(obj);
+	Q_UNUSED(tip);
+#endif
+}
+
+
+/**
+ * Helper function for access to mouse event global position in Qt5 and
+ */
+inline QPoint globalPositionOf(QMouseEvent* ev)
+{
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+    return ev->globalPosition().toPoint();
+#else
+    return ev->globalPos();
+#endif
+}
+
+
+/**
+ * Helper function to set the icon of a certain button.
+ * Use this function to set the icons for the dock area and dock widget buttons.
+ * The function first uses the CustomIconId to get an icon from the
+ * CIconProvider. You can register your custom icons with the icon provider, if
+ * you do not want to use the default buttons and if you do not want to use
+ * stylesheets.
+ * If the IconProvider does not return a valid icon (icon is null), the function
+ * fetches the given standard pixmap from the QStyle.
+ * param[in] Button The button whose icons are to be set
+ * param[in] StandardPixmap The standard pixmap to be used for the button
+ * param[in] CustomIconId The identifier for the custom icon.
+ */
+void setButtonIcon(QAbstractButton* Button, QStyle::StandardPixmap StandarPixmap,
+	ads::eIcon CustomIconId);
+
+
+enum eRepolishChildOptions
+{
+	RepolishIgnoreChildren,
+	RepolishDirectChildren,
+	RepolishChildrenRecursively
+};
+
+/**
+ * Calls unpolish() / polish for the style of the given widget to update
+ * stylesheet if a property changes
+ */
+void repolishStyle(QWidget* w, eRepolishChildOptions Options = RepolishIgnoreChildren);
+
+
+/**
+ * Returns the geometry of the given widget in global space
+ */
+QRect globalGeometry(QWidget* w);
+
+} // namespace internal
+} // namespace ads
+
+Q_DECLARE_OPERATORS_FOR_FLAGS(ads::DockWidgetAreas)
+//---------------------------------------------------------------------------
+#endif // ads_globalsH
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\AutoHideDockContainer.h
+==================================================
+#ifndef AutoHideDockContainerH
+#define AutoHideDockContainerH
+/*******************************************************************************
+** Qt Advanced Docking System
+** Copyright (C) 2017 Uwe Kindler
+**
+** This library is free software; you can redistribute it and/or
+** modify it under the terms of the GNU Lesser General Public
+** License as published by the Free Software Foundation; either
+** version 2.1 of the License, or (at your option) any later version.
+**
+** This library is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+** Lesser General Public License for more details.
+**
+** You should have received a copy of the GNU Lesser General Public
+** License along with this library; If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+
+//============================================================================
+/// \file   AutoHideDockContainer.h
+/// \author Syarif Fakhri
+/// \date   05.09.2022
+/// \brief  Declaration of CAutoHideDockContainer class
+//============================================================================
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include "ads_globals.h"
+
+#include <QSplitter>
+#include "AutoHideTab.h"
+
+QT_FORWARD_DECLARE_CLASS(QXmlStreamWriter)
+
+namespace ads
+{
+struct AutoHideDockContainerPrivate;
+class CDockManager;
+class CDockWidget;
+class CDockContainerWidget;
+class CAutoHideSideBar;
+class CDockAreaWidget;
+class CDockingStateReader;
+struct SideTabBarPrivate;
+
+/**
+ * Auto hide container for hosting an auto hide dock widget
+ */
+class ADS_EXPORT CAutoHideDockContainer : public QFrame
+{
+	Q_OBJECT
+    Q_PROPERTY(int sideBarLocation READ sideBarLocation)
+private:
+	AutoHideDockContainerPrivate* d; ///< private data (pimpl)
+	friend struct AutoHideDockContainerPrivate;
+	friend CAutoHideSideBar;
+	friend SideTabBarPrivate;
+
+protected:
+	virtual bool eventFilter(QObject* watched, QEvent* event) override;
+	virtual void resizeEvent(QResizeEvent* event) override;
+	virtual void leaveEvent(QEvent *event) override;
+	virtual bool event(QEvent* event) override;
+    virtual void dragLeaveEvent(QDragLeaveEvent* ev) override;
+
+	/**
+	 * Updates the size considering the size limits and the resize margins
+	 */
+	void updateSize();
+
+	/*
+	 * Saves the state and size
+	 */
+	void saveState(QXmlStreamWriter& Stream);
+
+public:
+	using Super = QFrame;
+
+    /**
+	 * Create Auto Hide widget with the given dock widget
+	 */
+	CAutoHideDockContainer(CDockWidget* DockWidget, SideBarLocation area,
+		CDockContainerWidget* parent);
+
+	/**
+	 * Virtual Destructor
+	 */
+	virtual ~CAutoHideDockContainer();
+
+	/**
+	 * Gets the side tab bar
+	 */
+	CAutoHideSideBar* autoHideSideBar() const;
+
+	/**
+	 * Returns the side tab
+	 */
+	CAutoHideTab* autoHideTab() const;
+
+	/**
+	 * Gets the dock widget in this dock container
+	 */
+	CDockWidget* dockWidget() const;
+
+	/**
+	 * Returns the index of this container in the sidebar
+	 */
+	int tabIndex() const;
+
+	/**
+	 * Adds a dock widget and removes the previous dock widget
+	 */
+	void addDockWidget(CDockWidget* DockWidget);
+
+    /**
+	 * Returns the side tab bar area of this Auto Hide dock container
+	 */
+	SideBarLocation sideBarLocation() const;
+
+	/**
+	 * Sets a new SideBarLocation.
+	 * If a new side bar location is set, the auto hide dock container needs
+	 * to update its resize handle position
+	 */
+	void setSideBarLocation(SideBarLocation SideBarLocation);
+
+	/**
+	 * Returns the dock area widget of this Auto Hide dock container
+	 */
+	CDockAreaWidget* dockAreaWidget() const;
+
+	/**
+	 * Returns the parent container that hosts this auto hide container
+	 */
+	CDockContainerWidget* dockContainer() const;
+
+	/**
+	 * Moves the contents to the parent container widget
+	 * Used before removing this Auto Hide dock container
+	 */
+    void moveContentsToParent();
+
+	/**
+	 * Cleanups up the side tab widget and then deletes itself
+	 */
+	void cleanupAndDelete();
+
+	/*
+	 * Toggles the auto Hide dock container widget
+	 * This will also hide the side tab widget
+	 */
+	void toggleView(bool Enable);
+
+	/*
+	 * Collapses the auto hide dock container widget
+	 * Does not hide the side tab widget
+	 */
+	void collapseView(bool Enable);
+
+	/**
+	 * Toggles the current collapse state
+	 */
+	void toggleCollapseState();
+
+	/**
+	 * Use this instead of resize.
+	 * Depending on the sidebar location this will set the width or height
+	 * of this auto hide container.
+	 */
+	void setSize(int Size);
+
+	/**
+	 * Resets the width or height to the initial dock widget size dependinng on
+	 * the orientation.
+	 * If the orientation is Qt::Horizontal, then the height is reset to
+	 * the initial size and if orientation is Qt::Vertical, then the width is
+	 * reset to the initial size
+	 */
+	void resetToInitialDockWidgetSize();
+
+	/**
+	 * Returns orientation of this container.
+	 * Left and right containers have a Qt::Vertical orientation and top / bottom
+	 * containers have a Qt::Horizontal orientation.
+	 * The function returns the orientation of the corresponding auto hide
+	 * side bar.
+	 */
+	Qt::Orientation orientation() const;
+
+	/**
+	 * Removes the AutoHide container from the current side bar and adds
+	 * it to the new side bar given in SideBarLocation
+	 */
+	void moveToNewSideBarLocation(SideBarLocation SideBarLocation, int TabIndex = -1);
+};
+} // namespace ads
+
+//-----------------------------------------------------------------------------
+#endif
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\AutoHideSideBar.h
+==================================================
+#ifndef AutoHideSideBarH
+#define AutoHideSideBarH
+/*******************************************************************************
+** Qt Advanced Docking System
+** Copyright (C) 2017 Uwe Kindler
+**
+** This library is free software; you can redistribute it and/or
+** modify it under the terms of the GNU Lesser General Public
+** License as published by the Free Software Foundation; either
+** version 2.1 of the License, or (at your option) any later version.
+**
+** This library is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+** Lesser General Public License for more details.
+**
+** You should have received a copy of the GNU Lesser General Public
+** License along with this library; If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+
+//============================================================================
+/// \file   AutoHideSideBar.h
+/// \author Syarif Fakhri
+/// \date   05.09.2022
+/// \brief  Declaration of CAutoHideSideBar class
+//============================================================================
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include <QScrollArea>
+#include "ads_globals.h"
+#include "AutoHideTab.h"
+
+QT_FORWARD_DECLARE_CLASS(QXmlStreamWriter)
+
+namespace ads
+{
+struct AutoHideSideBarPrivate;
+class DockContainerWidgetPrivate;
+class CDockContainerWidget;
+class CAutoHideTab;
+class CAutoHideDockContainer;
+class CDockingStateReader;
+
+/**
+ * Side tab bar widget that is shown at the edges of a dock container.
+ * The tab bar is only visible, if it contains visible content, that means if
+ * it contains visible tabs. If it is empty or all tabs are hidden, then the
+ * side bar is also hidden. As soon as one single tab becomes visible, this
+ * tab bar will be shown.
+ * The CAutoHideSideBar uses a QScrollArea here, to enable proper resizing.
+ * If the side bar contains many tabs, then the tabs are simply clipped - this
+ * is the same like in visual studio
+ */
+class ADS_EXPORT CAutoHideSideBar : public QScrollArea
+{
+    Q_OBJECT
+    Q_PROPERTY(int sideBarLocation READ sideBarLocation)
+    Q_PROPERTY(Qt::Orientation orientation READ orientation)
+    Q_PROPERTY(int spacing READ spacing WRITE setSpacing)
+
+private:
+    AutoHideSideBarPrivate* d; ///< private data (pimpl)
+	friend struct AutoHideSideBarPrivate;
+	friend class DockWidgetSideTab;
+	friend DockContainerWidgetPrivate;
+	friend CDockContainerWidget;
+
+protected:
+	virtual bool eventFilter(QObject *watched, QEvent *event) override;
+
+	/**
+	 * Saves the state into the given stream
+	 */
+	void saveState(QXmlStreamWriter& Stream) const;
+
+	/**
+	 * Inserts the given dock widget tab at the given position.
+	 * An Index value of -1 appends the side tab at the end.
+	 */
+	void insertTab(int Index, CAutoHideTab* SideTab);
+
+public:
+    using Super = QScrollArea;
+
+	/**
+	 * Default Constructor
+	 */
+    CAutoHideSideBar(CDockContainerWidget* parent, SideBarLocation area);
+
+	/**
+	 * Virtual Destructor
+	 */
+	virtual ~CAutoHideSideBar();
+
+	/**
+	 * Removes the given DockWidgetSideTab from the tabbar
+	 */
+	void removeTab(CAutoHideTab* SideTab);
+
+	/**
+	 * Insert dock widget into the side bar.
+	 * The function creates the auto hide dock container, inserts the
+	 * auto hide tab
+	 */
+	CAutoHideDockContainer* insertDockWidget(int Index, CDockWidget* DockWidget);
+
+	/**
+	 * Removes the auto hide widget from this side bar
+	 */
+	void removeAutoHideWidget(CAutoHideDockContainer* AutoHideWidget);
+
+	/**
+	 * Adds the given AutoHideWidget to this sidebar.
+	 * If the AutoHideWidget is in another sidebar, then it will be removed
+	 * from this sidebar.
+	 */
+	void addAutoHideWidget(CAutoHideDockContainer* AutoHideWidget, int Index = TabDefaultInsertIndex);
+
+	/**
+	 * Returns orientation of side tab.
+	 */
+	Qt::Orientation orientation() const;
+
+	/*
+	 * Get the side tab widget at position, returns nullptr if it's out of bounds
+	 */
+	CAutoHideTab* tab(int index) const;
+
+	/**
+	 * Returns the tab at the given position.
+	 * Returns -1 if the position is left of the first tab and count() if the
+	 * position is right of the last tab. Returns InvalidTabIndex (-2) to
+	 * indicate an invalid value.
+	 */
+	int tabAt(const QPoint& Pos) const;
+
+	/**
+	 * Returns the tab insertion index for the given mouse cursor position
+	 */
+	int tabInsertIndexAt(const QPoint& Pos) const;
+
+	/**
+	 * Returns the index of the given tab
+	 */
+	int indexOfTab(const CAutoHideTab& Tab) const;
+
+	/*
+	 * Gets the count of the tab widgets
+	 */
+	int count() const;
+
+	/**
+	 * Returns the number of visible tabs to its parent widget.
+	 */
+	int visibleTabCount() const;
+
+	/**
+	 * Returns true, if the sidebar contains visible tabs to its parent widget.
+	 * The function returns as soon as it finds the first visible tab.
+	 * That means, if you just want to find out if there are visible tabs
+	 * then this function is quicker than visibleTabCount()
+	 */
+	bool hasVisibleTabs() const;
+
+	/**
+	 * Getter for side tab bar area property
+	 */
+	SideBarLocation sideBarLocation() const;
+
+	/**
+	 * Overrides the minimumSizeHint() function of QScrollArea
+	 * The minimumSizeHint() is bigger than the sizeHint () for the scroll
+	 * area because even if the scrollbars are invisible, the required space
+	 * is reserved in the minimumSizeHint(). This override simply returns
+	 * sizeHint();
+	 */
+	virtual QSize minimumSizeHint() const override;
+
+	/**
+	 * The function provides a sizeHint that matches the height of the
+	 * internal viewport.
+	 */
+	virtual QSize sizeHint() const override;
+
+	/**
+	 * Getter for spacing property - returns the spacing of the tabs
+	 */
+	int spacing() const;
+
+	/**
+	 * Setter for spacing property - sets the spacing
+	 */
+	void setSpacing(int Spacing);
+
+	/**
+	 * Returns the dock container that hosts this sideBar()
+	 */
+	CDockContainerWidget* dockContainer() const;
+};
+} // namespace ads
+//-----------------------------------------------------------------------------
+#endif
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\AutoHideTab.h
+==================================================
+#ifndef AutoHideTabH
+#define AutoHideTabH
+/*******************************************************************************
+** Qt Advanced Docking System
+** Copyright (C) 2017 Uwe Kindler
+**
+** This library is free software; you can redistribute it and/or
+** modify it under the terms of the GNU Lesser General Public
+** License as published by the Free Software Foundation; either
+** version 2.1 of the License, or (at your option) any later version.
+**
+** This library is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+** Lesser General Public License for more details.
+**
+** You should have received a copy of the GNU Lesser General Public
+** License along with this library; If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+
+//============================================================================
+/// \file   AutoHideTab.h
+/// \author Syarif Fakhri
+/// \date   05.09.2022
+/// \brief  Declaration of CAutoHideTab class
+//============================================================================
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include "PushButton.h"
+
+#include "ads_globals.h"
+
+namespace ads
+{
+struct AutoHideTabPrivate;
+class CDockWidget;
+class CAutoHideSideBar;
+class CDockWidgetTab;
+class DockContainerWidgetPrivate;
+
+/**
+ * A dock widget Side tab that shows a title or an icon.
+ * The dock widget tab is shown in the side tab bar to switch between
+ * pinned dock widgets
+ */
+class ADS_EXPORT CAutoHideTab : public CPushButton
+{
+    Q_OBJECT
+
+    Q_PROPERTY(int sideBarLocation READ sideBarLocation)
+    Q_PROPERTY(Qt::Orientation orientation READ orientation)
+	Q_PROPERTY(bool activeTab READ isActiveTab)
+	Q_PROPERTY(bool iconOnly READ iconOnly)
+
+private:
+	AutoHideTabPrivate* d; ///< private data (pimpl)
+    friend struct AutoHideTabPrivate;
+	friend class CDockWidget;
+	friend class CAutoHideDockContainer;
+	friend class CAutoHideSideBar;
+	friend class CDockAreaWidget;
+	friend class CDockContainerWidget;
+	friend DockContainerWidgetPrivate;
+
+private Q_SLOTS:
+	void onAutoHideToActionClicked();
+	void onDragHoverDelayExpired();
+
+protected:
+	void setSideBar(CAutoHideSideBar *SideTabBar);
+	void removeFromSideBar();
+	virtual bool event(QEvent* event) override;
+	virtual void contextMenuEvent(QContextMenuEvent* ev) override;
+	virtual void mousePressEvent(QMouseEvent* ev) override;
+	virtual void mouseReleaseEvent(QMouseEvent* ev) override;
+	virtual void mouseMoveEvent(QMouseEvent* ev) override;
+    virtual void dragEnterEvent(QDragEnterEvent* ev) override;
+    virtual void dragLeaveEvent(QDragLeaveEvent* ev) override;
+
+public:
+    using Super = CPushButton;
+
+	/**
+	 * Default Constructor
+	 * param[in] DockWidget The dock widget this title bar belongs to
+	 * param[in] parent The parent widget of this title bar
+	 */
+	CAutoHideTab(QWidget* parent = nullptr);
+
+	/**
+	 * Virtual Destructor
+	 */
+    ~CAutoHideTab() override;
+
+	/**
+	 * Update stylesheet style if a property changes
+	 */
+	void updateStyle();
+
+	/**
+	 * Getter for side tab bar area property
+	 */
+	SideBarLocation sideBarLocation() const;
+
+	/**
+	 * Set orientation vertical or horizontal
+	 */
+	void setOrientation(Qt::Orientation Orientation);
+
+	/**
+	 * Returns the current orientation
+	 */
+	Qt::Orientation orientation() const;
+
+	/**
+	 * Returns true, if this is the active tab. The tab is active if the auto
+	 * hide widget is visible
+	 */
+	bool isActiveTab() const;
+
+	/**
+	 * returns the dock widget this belongs to
+	 */
+	CDockWidget* dockWidget() const;
+
+	/**
+	 * Sets the dock widget that is controlled by this tab
+	 */
+	void setDockWidget(CDockWidget* DockWidget);
+
+	/**
+	 * Returns true if the auto hide config flag AutoHideSideBarsIconOnly
+	 * is set and if the tab has an icon - that means the icon is not null
+	 */
+	bool iconOnly() const;
+
+	/**
+	 * Returns the side bar that contains this tab or a nullptr if the tab is
+	 * not in a side bar
+	 */
+	CAutoHideSideBar* sideBar() const;
+
+	/**
+	 * Returns the index of this tab in the sideBar
+	 */
+	int tabIndex() const;
+
+public Q_SLOTS:
+	/**
+	 * Set the dock widget floating, if it is floatable
+	 */
+	void setDockWidgetFloating();
+
+	/**
+	 * Unpin and dock the auto hide widget
+	 */
+	void unpinDockWidget();
+
+	/**
+	 * Calls the requestCloseDockWidget() function for the assigned dock widget
+	 */
+	void requestCloseDockWidget();
+}; // class AutoHideTab
+}
+ // namespace ads
+//-----------------------------------------------------------------------------
+
+#endif
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\DockAreaTabBar.h
+==================================================
+#ifndef DockAreaTabBarH
+#define DockAreaTabBarH
+/*******************************************************************************
+** Qt Advanced Docking System
+** Copyright (C) 2017 Uwe Kindler
+**
+** This library is free software; you can redistribute it and/or
+** modify it under the terms of the GNU Lesser General Public
+** License as published by the Free Software Foundation; either
+** version 2.1 of the License, or (at your option) any later version.
+**
+** This library is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+** Lesser General Public License for more details.
+**
+** You should have received a copy of the GNU Lesser General Public
+** License along with this library; If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+
+//============================================================================
+/// \file   DockAreaTabBar.h
+/// \author Uwe Kindler
+/// \date   24.08.2018
+/// \brief  Declaration of CDockAreaTabBar class
+//============================================================================
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include <QScrollArea>
+#include "ads_globals.h"
+
+namespace ads
+{
+class CDockAreaWidget;
+class CDockWidgetTab;
+struct DockAreaTabBarPrivate;
+class CDockAreaTitleBar;
+class CFloatingDockContainer;
+class IFloatingWidget;
+
+/**
+ * Custom tabbar implementation for tab area that is shown on top of a
+ * dock area widget.
+ * The tabbar displays the tab widgets of the contained dock widgets.
+ * We cannot use QTabBar here because it does a lot of fancy animations
+ * that will crash the application if a tab is removed while the animation
+ * has not finished. And we need to remove a tab, if the user drags a
+ * a dock widget out of a group of tabbed widgets
+ */
+class ADS_EXPORT CDockAreaTabBar : public QScrollArea
+{
+	Q_OBJECT
+private:
+	DockAreaTabBarPrivate* d; ///< private data (pimpl)
+	friend struct DockAreaTabBarPrivate;
+	friend class CDockAreaTitleBar;
+
+private Q_SLOTS:
+	void onTabClicked();
+	void onTabCloseRequested();
+	void onCloseOtherTabsRequested();
+	void onTabWidgetMoved(const QPoint& GlobalPos);
+
+protected:
+    virtual void wheelEvent(QWheelEvent* Event) override;
+
+public:
+	using Super = QScrollArea;
+
+	/**
+	 * Default Constructor
+	 */
+	CDockAreaTabBar(CDockAreaWidget* parent);
+
+	/**
+	 * Virtual Destructor
+	 */
+	virtual ~CDockAreaTabBar();
+
+	/**
+	 * Inserts the given dock widget tab at the given position.
+	 * Inserting a new tab at an index less than or equal to the current index
+	 * will increment the current index, but keep the current tab.
+	 */
+	void insertTab(int Index, CDockWidgetTab* Tab);
+
+	/**
+	 * Removes the given DockWidgetTab from the tabbar
+	 */
+	void removeTab(CDockWidgetTab* Tab);
+
+	/**
+	 * Returns the number of tabs in this tabbar
+	 */
+	int count() const;
+
+	/**
+	 * Returns the current index or -1 if no tab is selected
+	 */
+	int currentIndex() const;
+
+	/**
+	 * Returns the current tab or a nullptr if no tab is selected.
+	 */
+	CDockWidgetTab* currentTab() const;
+
+	/**
+	 * Returns the tab with the given index
+	 */
+	CDockWidgetTab* tab(int Index) const;
+
+	/**
+	 * Returns the tab at the given position.
+	 * Returns -1 if the position is left of the first tab and count() if the
+	 * position is right of the last tab. Returns -2 to indicate an invalid
+	 * value.
+	 */
+	int tabAt(const QPoint& Pos) const;
+
+	/**
+	 * Returns the tab insertion index for the given mouse cursor position
+	 */
+	int tabInsertIndexAt(const QPoint& Pos) const;
+
+	/**
+	 * Filters the tab widget events
+	 */
+	virtual bool eventFilter(QObject *watched, QEvent *event) override;
+
+	/**
+	 * This function returns true if the tab is open, that means if it is
+	 * visible to the user. If the function returns false, the tab is
+	 * closed
+	 */
+	bool isTabOpen(int Index) const;
+
+	/**
+	 * Overrides the minimumSizeHint() function of QScrollArea
+	 * The minimumSizeHint() is bigger than the sizeHint () for the scroll
+	 * area because even if the scrollbars are invisible, the required space
+	 * is reserved in the minimumSizeHint(). This override simply returns
+	 * sizeHint();
+	 */
+	virtual QSize minimumSizeHint() const override;
+
+	/**
+	 * The function provides a sizeHint that matches the height of the
+	 * internal viewport.
+	 */
+	virtual QSize sizeHint() const override;
+
+	/**
+	 * This function returns true, if the tabs need more space than the size
+	 * of the tab bar.
+	 */
+	bool areTabsOverflowing() const;
+
+public Q_SLOTS:
+	/**
+	 * This property sets the index of the tab bar's visible tab
+	 */
+	void setCurrentIndex(int Index);
+
+	/**
+	 * This function will close the tab given in Index param.
+	 * Closing a tab means, the tab will be hidden, it will not be removed
+	 */
+	void closeTab(int Index);
+
+Q_SIGNALS:
+    /**
+     * This signal is emitted when the tab bar's current tab is about to be changed. The new
+     * current has the given index, or -1 if there isn't a new one.
+     */
+	void currentChanging(int Index);
+
+	/**
+	 * This signal is emitted when the tab bar's current tab changes. The new
+	 * current has the given index, or -1 if there isn't a new one
+	 */
+	void currentChanged(int Index);
+
+	/**
+	 * This signal is emitted when user clicks on a tab
+	 */
+	void tabBarClicked(int index);
+
+	/**
+	 * This signal is emitted when the close button on a tab is clicked.
+	 * The index is the index that should be closed.
+	 */
+	void tabCloseRequested(int index);
+
+	/**
+	 * This signal is emitted if a tab has been closed
+	 */
+	void tabClosed(int index);
+
+	/**
+	 * This signal is emitted if a tab has been opened.
+	 * A tab is opened if it has been made visible
+	 */
+	void tabOpened(int index);
+
+	/**
+	 * This signal is emitted when the tab has moved the tab at index position
+	 * from to index position to.
+	 */
+	void tabMoved(int from, int to);
+
+	/**
+	 * This signal is emitted, just before the tab with the given index is
+	 * removed
+	 */
+	void removingTab(int index);
+
+	/**
+	 * This signal is emitted if a tab has been inserted
+	 */
+	void tabInserted(int index);
+
+	/**
+	 * This signal is emitted when a tab title elide state has been changed
+	 */
+	void elidedChanged(bool elided);
+}; // class CDockAreaTabBar
+} // namespace ads
+//-----------------------------------------------------------------------------
+#endif // DockAreaTabBarH
+
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\DockAreaTitleBar.h
+==================================================
+#ifndef DockAreaTitleBarH
+#define DockAreaTitleBarH
+/*******************************************************************************
+** Qt Advanced Docking System
+** Copyright (C) 2017 Uwe Kindler
+**
+** This library is free software; you can redistribute it and/or
+** modify it under the terms of the GNU Lesser General Public
+** License as published by the Free Software Foundation; either
+** version 2.1 of the License, or (at your option) any later version.
+**
+** This library is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+** Lesser General Public License for more details.
+**
+** You should have received a copy of the GNU Lesser General Public
+** License along with this library; If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+
+//============================================================================
+/// \file   DockAreaTitleBar.h
+/// \author Uwe Kindler
+/// \date   12.10.2018
+/// \brief  Declaration of CDockAreaTitleBar class
+//============================================================================
+
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include <QToolButton>
+#include <QFrame>
+
+#include "ads_globals.h"
+
+QT_FORWARD_DECLARE_CLASS(QAbstractButton)
+
+namespace ads
+{
+class CDockAreaTabBar;
+class CDockAreaWidget;
+struct DockAreaTitleBarPrivate;
+class CElidingLabel;
+class CDockAreaTitleBar;
+
+using tTitleBarButton = QToolButton;
+
+/**
+* Title bar button of a dock area that customizes tTitleBarButton appearance/behaviour
+* according to various config flags such as:
+* CDockManager::DockAreaHas_xxx_Button - if set to 'false' keeps the button always invisible
+* CDockManager::DockAreaHideDisabledButtons - if set to 'true' hides button when it is disabled
+*/
+class CTitleBarButton : public tTitleBarButton
+{
+	Q_OBJECT
+
+private:
+	bool ShowInTitleBar = true;
+	bool HideWhenDisabled = false;
+	TitleBarButton TitleBarButtonId;
+
+public:
+	using Super = tTitleBarButton;
+	CTitleBarButton(bool ShowInTitleBar, bool HideWhenDisabled, TitleBarButton ButtonId,
+		QWidget* parent = nullptr);
+
+	/**
+	* Adjust this visibility change request with our internal settings:
+	*/
+	virtual void setVisible(bool visible) override;
+
+	/**
+	 * Configures, if the title bar button should be shown in title bar
+	 */
+	void setShowInTitleBar(bool Show);
+
+	/**
+	 * Identifier for the title bar button
+	 */
+	TitleBarButton buttonId() const {return TitleBarButtonId;}
+
+	/**
+	 * Return the title bar that contains this button
+     */
+	CDockAreaTitleBar* titleBar() const;
+
+	/**
+	 * Returns true, if the button is in a title bar in an auto hide area
+	 */
+	bool isInAutoHideArea() const;
+
+
+protected:
+	/**
+	* Handle EnabledChanged signal to set button invisible if the configured
+	*/
+	bool event(QEvent *ev) override;
+};
+
+
+/**
+ * Title bar of a dock area.
+ * The title bar contains a tabbar with all tabs for a dock widget group and
+ * with a tabs menu button, a undock button and a close button.
+ */
+class ADS_EXPORT CDockAreaTitleBar : public QFrame
+{
+	Q_OBJECT
+private:
+	DockAreaTitleBarPrivate* d; ///< private data (pimpl)
+	friend struct DockAreaTitleBarPrivate;
+
+private Q_SLOTS:
+	void onTabsMenuAboutToShow();
+	void onCloseButtonClicked();
+	void onAutoHideCloseActionTriggered();
+	void minimizeAutoHideContainer();
+	void onUndockButtonClicked();
+	void onTabsMenuActionTriggered(QAction* Action);
+	void onCurrentTabChanged(int Index);
+	void onAutoHideButtonClicked();
+	void onAutoHideDockAreaActionClicked();
+	void onAutoHideToActionClicked();
+
+protected:
+    /**
+	 * Stores mouse position to detect dragging
+	 */
+	virtual void mousePressEvent(QMouseEvent* ev) override;
+
+	/**
+	 * Stores mouse position to detect dragging
+	 */
+	virtual void mouseReleaseEvent(QMouseEvent* ev) override;
+
+	/**
+	 * Starts floating the complete docking area including all dock widgets,
+	 * if it is not the last dock area in a floating widget
+	 */
+	virtual void mouseMoveEvent(QMouseEvent* ev) override;
+
+	/**
+	 * Double clicking the title bar also starts floating of the complete area
+	 */
+	virtual void mouseDoubleClickEvent(QMouseEvent *event) override;
+
+	/**
+	 * Show context menu
+	 */
+	virtual void contextMenuEvent(QContextMenuEvent *event) override;
+
+	/**
+	 * Handle resize events
+	 */
+	virtual void resizeEvent(QResizeEvent *event) override;
+
+public Q_SLOTS:
+	/**
+	 * Call this slot to tell the title bar that it should update the tabs menu
+	 * the next time it is shown.
+	 */
+	void markTabsMenuOutdated();
+
+
+public:
+	using Super = QFrame;
+
+	/**
+	 * Default Constructor
+	 */
+	CDockAreaTitleBar(CDockAreaWidget* parent);
+
+	/**
+	 * Virtual Destructor
+	 */
+	virtual ~CDockAreaTitleBar();
+
+	/**
+	 * Returns the pointer to the tabBar()
+	 */
+	CDockAreaTabBar* tabBar() const;
+
+	/**
+	 * Returns the button corresponding to the given title bar button identifier
+	 */
+	CTitleBarButton* button(TitleBarButton which) const;
+
+	/**
+	 * Returns the auto hide title label, used when the dock area is expanded and auto hidden
+	 */
+	CElidingLabel* autoHideTitleLabel() const;
+
+	/**
+     * Returns the dock area widget that contains this title bar
+     */
+	CDockAreaWidget* dockAreaWidget() const;
+
+	/**
+	 * Updates the visibility of the dock widget actions in the title bar
+	 */
+	void updateDockWidgetActionsButtons();
+
+	/**
+	 * Marks the tabs menu outdated before it calls its base class
+	 * implementation
+	 */
+	virtual void setVisible(bool Visible) override;
+
+	/**
+	 * Inserts a custom widget at position index into this title bar.
+	 * If index is negative, the widget is added at the end.
+	 * You can use this function to insert custom widgets into the title bar.
+	 */
+	void insertWidget(int index, QWidget *widget);
+
+	/**
+	 * Searches for widget widget in this title bar.
+	 * You can use this function, to get the position of the default
+	 * widget in the tile bar.
+	 * \code
+	 * int tabBarIndex = TitleBar->indexOf(TitleBar->tabBar());
+	 * int closeButtonIndex = TitleBar->indexOf(TitleBar->button(TitleBarButtonClose));
+	 * \endcode
+	 */
+	int indexOf(QWidget *widget) const;
+
+	/**
+	 * Close group tool tip based on the current state
+	 * Auto hide widgets can only have one dock widget so it does not make sense for the tooltip to show close group
+	 */
+	QString titleBarButtonToolTip(TitleBarButton Button) const;
+
+	/**
+	 * Moves the dock area into its own floating widget if the area
+	 * DockWidgetFloatable flag is true
+	 */
+	void setAreaFloating();
+
+	/**
+	 * Call this function, to create all the required auto hide controls
+	 */
+	void showAutoHideControls(bool Show);
+
+	/**
+	 * Returns true, if the auto hide controls are visible
+	 */
+	bool isAutoHide() const;
+
+    /**
+     * Fills the provided menu with standard entries. If a nullptr is passed, a
+     * new menu is created and filled with standard entries.
+     * This function is called from the actual version of contextMenuEvent, but
+     * can be called from any code. Caller is responsible of deleting the created
+     * object.
+     *
+     * @param menu The QMenu to fill with standard entries. If nullptr, a new
+     * QMenu will be created.
+     * @return The filled QMenu, either the provided one or a newly created one if
+     * nullptr was passed.
+     */
+    virtual QMenu *buildContextMenu(QMenu *);
+
+Q_SIGNALS:
+	/**
+	 * This signal is emitted if a tab in the tab bar is clicked by the user
+	 * or if the user clicks on a tab item in the title bar tab menu.
+	 */
+	void tabBarClicked(int index);
+}; // class name
+
+}
+ // namespace ads
+//-----------------------------------------------------------------------------
+#endif // DockAreaTitleBarH
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\DockAreaTitleBar_p.h
+==================================================
+#ifndef DockAreaTitleBar_pH
+#define DockAreaTitleBar_pH
+/*******************************************************************************
+** Qt Advanced Docking System
+** Copyright (C) 2017 Uwe Kindler
+**
+** This library is free software; you can redistribute it and/or
+** modify it under the terms of the GNU Lesser General Public
+** License as published by the Free Software Foundation; either
+** version 2.1 of the License, or (at your option) any later version.
+**
+** This library is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+** Lesser General Public License for more details.
+**
+** You should have received a copy of the GNU Lesser General Public
+** License along with this library; If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+
+//============================================================================
+/// \file   DockAreaTitleBar_p.h
+/// \author Uwe Kindler
+/// \date   12.10.2018
+/// \brief  Declaration of classes CTitleBarButton and CSpacerWidget
+//============================================================================
+
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include <QFrame>
+
+#include "ads_globals.h"
+
+namespace ads
+{
+
+
+
+/**
+* This spacer widget is here because of the following problem.
+* The dock area title bar handles mouse dragging and moving the floating widget.
+* The  problem is, that if the title bar becomes invisible, i.e. if the dock
+* area contains only one single dock widget and the dock area is moved
+* into a floating widget, then mouse events are not handled anymore and dragging
+* of the floating widget stops.
+*/
+class CSpacerWidget : public QWidget
+{
+	Q_OBJECT
+public:
+	using Super = QWidget;
+	CSpacerWidget(QWidget* Parent = nullptr);
+	virtual QSize sizeHint() const override {return QSize(0, 0);}
+	virtual QSize minimumSizeHint() const override {return QSize(0, 0);}
+};
+
+}
+ // namespace ads
+//-----------------------------------------------------------------------------
+#endif // DockAreaTitleBar_pH
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\DockAreaWidget.h
+==================================================
+#ifndef DockAreaWidgetH
+#define DockAreaWidgetH
+/*******************************************************************************
+** Qt Advanced Docking System
+** Copyright (C) 2017 Uwe Kindler
+**
+** This library is free software; you can redistribute it and/or
+** modify it under the terms of the GNU Lesser General Public
+** License as published by the Free Software Foundation; either
+** version 2.1 of the License, or (at your option) any later version.
+**
+** This library is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+** Lesser General Public License for more details.
+**
+** You should have received a copy of the GNU Lesser General Public
+** License along with this library; If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+
+//============================================================================
+/// \file   DockAreaWidget.h
+/// \author Uwe Kindler
+/// \date   24.02.2017
+/// \brief  Declaration of CDockAreaWidget class
+//============================================================================
+
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include <QFrame>
+
+#include "ads_globals.h"
+#include "AutoHideTab.h"
+#include "DockWidget.h"
+
+QT_FORWARD_DECLARE_CLASS(QXmlStreamWriter)
+QT_FORWARD_DECLARE_CLASS(QAbstractButton)
+QT_FORWARD_DECLARE_CLASS(QMenu)
+
+namespace ads
+{
+struct DockAreaWidgetPrivate;
+class CDockManager;
+class CDockContainerWidget;
+class DockContainerWidgetPrivate;
+class CDockAreaTitleBar;
+class CDockingStateReader;
+class CDockSplitter;
+
+
+/**
+ * DockAreaWidget manages multiple instances of DockWidgets.
+ * It displays a title tab, which is clickable and will switch to
+ * the contents associated to the title when clicked.
+ */
+class ADS_EXPORT CDockAreaWidget : public QFrame
+{
+	Q_OBJECT
+private:
+	DockAreaWidgetPrivate* d; ///< private data (pimpl)
+	friend struct DockAreaWidgetPrivate;
+	friend class CDockContainerWidget;
+	friend class DockContainerWidgetPrivate;
+	friend class CDockWidgetTab;
+	friend struct DockWidgetPrivate;
+	friend class CDockWidget;
+	friend struct DockManagerPrivate;
+	friend class CDockManager;
+	friend class CAutoHideDockContainer;
+	void onDockWidgetFeaturesChanged();
+
+private Q_SLOTS:
+	void onTabCloseRequested(int Index);
+
+	/**
+	 * Reorder the index position of DockWidget at fromIndx to toIndex
+	 * if a tab in the tabbar is dragged from one index to another one
+	 */
+	void reorderDockWidget(int fromIndex, int toIndex);
+
+	/*
+	 * Update the auto hide button checked state based on if it's contained in an auto hide container or not
+	 */
+	void updateAutoHideButtonCheckState();
+
+	/*
+	 * Update the title bar button tooltips
+	 */
+	void updateTitleBarButtonsToolTips();
+
+	/**
+	 * Calculate the auto hide side bar location depending on the dock area
+	 * widget position in the container
+	 */
+	SideBarLocation calculateSideTabBarArea() const;
+
+protected:
+
+#ifdef Q_OS_WIN
+	/**
+	 * Reimplements QWidget::event to handle QEvent::PlatformSurface
+	 * This is here to fix issue #294 Tab refresh problem with a QGLWidget
+	 * that exists since Qt version 5.12.7. So this function is here to
+	 * work around a Qt issue.
+	 */
+	virtual bool event(QEvent *event) override;
+#endif
+
+	/**
+	 * Inserts a dock widget into dock area.
+	 * All dockwidgets in the dock area tabified in a stacked layout with tabs.
+	 * The index indicates the index of the new dockwidget in the tabbar and
+	 * in the stacked layout. If the Activate parameter is true, the new
+	 * DockWidget will be the active one in the stacked layout
+	 */
+	void insertDockWidget(int index, CDockWidget* DockWidget, bool Activate = true);
+
+	/**
+	 * Add a new dock widget to dock area.
+	 * All dockwidgets in the dock area tabified in a stacked layout with tabs
+	 */
+	void addDockWidget(CDockWidget* DockWidget);
+
+	/**
+	 * Removes the given dock widget from the dock area
+	 */
+	void removeDockWidget(CDockWidget* DockWidget);
+
+	/**
+	 * Called from dock widget if it is opened or closed
+	 */
+	void toggleDockWidgetView(CDockWidget* DockWidget, bool Open);
+
+	/**
+	 * This is a helper function to get the next open dock widget to activate
+	 * if the given DockWidget will be closed or removed.
+	 * The function returns the next widget that should be activated or
+	 * nullptr in case there are no more open widgets in this area.
+	 */
+	CDockWidget* nextOpenDockWidget(CDockWidget* DockWidget) const;
+
+	/**
+	 * Returns the index of the given DockWidget in the internal layout
+	 */
+	int index(CDockWidget* DockWidget);
+
+	/**
+	 * Call this function, if you already know, that the dock does not
+	 * contain any visible content (any open dock widgets).
+	 */
+	void hideAreaWithNoVisibleContent();
+
+	/**
+	 * Updates the dock area layout and components visibility
+	 */
+	void updateTitleBarVisibility();
+
+	/**
+	 * This is the internal private function for setting the current widget.
+	 * This function is called by the public setCurrentDockWidget() function
+	 * and by the dock manager when restoring the state
+	 */
+	void internalSetCurrentDockWidget(CDockWidget* DockWidget);
+
+	/**
+	 * Call this function to update the window title
+	 */
+	void updateWindowTitle();
+
+	/**
+	 * Marks tabs menu to update
+	 */
+	void markTitleBarMenuOutdated();
+
+	/*
+	 * Update the title bar button visibility based on if it's top level or not
+	 */
+	void updateTitleBarButtonVisibility(bool IsTopLevel) const;
+
+protected Q_SLOTS:
+	void toggleView(bool Open);
+
+public:
+	using Super = QFrame;
+
+	/**
+	 * Dock area related flags
+	 */
+	enum eDockAreaFlag
+	{
+		HideSingleWidgetTitleBar = 0x0001,
+		DefaultFlags = 0x0000
+	};
+	Q_DECLARE_FLAGS(DockAreaFlags, eDockAreaFlag)
+
+    /**
+	 * Default Constructor
+	 */
+	CDockAreaWidget(CDockManager* DockManager, CDockContainerWidget* parent);
+
+	/**
+	 * Virtual Destructor
+	 */
+	~CDockAreaWidget() override;
+
+	/**
+	 * Returns the dock manager object this dock area belongs to
+	 */
+	CDockManager* dockManager() const;
+
+	/**
+	 * Returns the dock container widget this dock area widget belongs to or 0
+	 * if there is no
+	 */
+	CDockContainerWidget* dockContainer() const;
+
+	/**
+	 * Returns the auto hide dock container widget this dock area widget belongs to or 0
+	 * if there is no
+	 */
+	CAutoHideDockContainer* autoHideDockContainer() const; 
+
+	/**
+	 * Returns the parent splitter that contains this dock area
+	 */
+	CDockSplitter* parentSplitter() const;
+
+	/**
+	 * Returns true if the dock area is in an auto hide container
+	 */
+	bool isAutoHide() const;
+
+	/**
+	 * Sets the current auto hide dock container
+	 */
+	void setAutoHideDockContainer(CAutoHideDockContainer* AutoHideDockContainer);
+
+    /**
+     * Returns the largest minimumSizeHint() of the dock widgets in this
+     * area.
+     * The minimum size hint is updated if a dock widget is removed or added.
+     */
+    virtual QSize minimumSizeHint() const override;
+
+	/**
+	 * Returns the rectangle of the title area
+	 */
+	QRect titleBarGeometry() const;
+
+	/**
+	 * Returns the rectangle of the content
+	 */
+	QRect contentAreaGeometry() const;
+
+	/**
+	 * Returns the number of dock widgets in this area
+	 */
+	int dockWidgetsCount() const;
+
+	/**
+	 * Returns a list of all dock widgets in this dock area.
+	 * This list contains open and closed dock widgets.
+	 */
+	QList<CDockWidget*> dockWidgets() const;
+
+	/**
+	 * Returns the number of open dock widgets in this area
+	 */
+	int openDockWidgetsCount() const;
+
+	/**
+	 * Returns a list of dock widgets that are not closed.
+	 */
+	QList<CDockWidget*> openedDockWidgets() const;
+
+	/**
+	 * Returns a dock widget by its index
+	 */
+	CDockWidget* dockWidget(int Index) const;
+
+	/**
+	 * Returns the index of the current active dock widget or -1 if there
+	 * are is no active dock widget (ie.e if all dock widgets are closed)
+	 */
+	int currentIndex() const;
+
+	/**
+	 * Returns the index of the first open dock widgets in the list of
+	 * dock widgets.
+	 * This function is here for performance reasons. Normally it would
+	 * be possible to take the first dock widget from the list returned by
+	 * openedDockWidgets() function. But that function enumerates all
+	 * dock widgets while this functions stops after the first open dock widget.
+	 * If there are no open dock widgets, the function returns -1.
+	 */
+	int indexOfFirstOpenDockWidget() const;
+
+	/**
+	 * Returns the current active dock widget or a nullptr if there is no
+	 * active dock widget (i.e. if all dock widgets are closed)
+	 */
+	CDockWidget* currentDockWidget() const;
+
+	/**
+	 * Shows the tab with the given dock widget
+	 */
+	void setCurrentDockWidget(CDockWidget* DockWidget);
+
+	/**
+	 * Saves the state into the given stream
+	 */
+	void saveState(QXmlStreamWriter& Stream) const;
+
+    /**
+	 * Restores a dock area.
+	 * \see restoreChildNodes() for details
+	 */
+    static bool restoreState(CDockingStateReader& Stream, CDockAreaWidget*& CreatedWidget,
+		bool Testing, CDockContainerWidget* ParentContainer);
+
+	/**
+	 * This functions returns the dock widget features of all dock widget in
+	 * this area.
+	 * A bitwise and is used to combine the flags of all dock widgets. That
+	 * means, if only one single dock widget does not support a certain flag,
+	 * the whole dock are does not support the flag. I.e. if one single
+	 * dock widget in this area is not closable, the whole dock are is not
+	 * closable.
+	 */
+	CDockWidget::DockWidgetFeatures features(eBitwiseOperator Mode = BitwiseAnd) const;
+
+	/**
+	 * Returns the title bar button corresponding to the given title bar
+	 * button identifier
+	 */
+	QAbstractButton* titleBarButton(TitleBarButton which) const;
+
+	/**
+	 * Update the close button if visibility changed
+	 */
+	virtual void setVisible(bool Visible) override;
+
+	/**
+	 * Configures the areas of this particular dock area that are allowed for docking
+	 */
+	void setAllowedAreas(DockWidgetAreas areas);
+
+	/**
+	 * Returns flags with all allowed drop areas of this particular dock area
+	 */
+	DockWidgetAreas allowedAreas() const;
+
+	/**
+	 * Returns the title bar of this dock area
+	 */
+	CDockAreaTitleBar* titleBar() const;
+
+	/**
+	 * Returns the dock area flags - a combination of flags that configure the
+	 * appearance and features of the dock area.
+	 * \see setDockAreaFlasg()
+	 */
+	DockAreaFlags dockAreaFlags() const;
+
+	/**
+	 * Sets the dock area flags - a combination of flags that configure the
+	 * appearance and features of the dock area
+	 */
+	void setDockAreaFlags(DockAreaFlags Flags);
+
+	/**
+	 * Sets the dock area flag Flag on this widget if on is true; otherwise
+	 * clears the flag.
+	 */
+	void setDockAreaFlag(eDockAreaFlag Flag, bool On);
+
+    /**
+     * Returns true if the area has a single dock widget and contains the central widget of it's manager.
+     */
+    bool isCentralWidgetArea() const;
+
+    /**
+     * Returns true if the area contains the central widget of it's manager.
+     */
+    bool containsCentralWidget() const;
+
+    /**
+     * If this dock area is the one and only visible area in a container, then
+     * this function returns true
+     */
+    bool isTopLevelArea() const;
+
+
+public Q_SLOTS:
+	/**
+	 * This activates the tab for the given tab index.
+	 * If the dock widget for the given tab is not visible, the this function
+	 * call will make it visible.
+	 */
+	void setCurrentIndex(int index);
+
+	/**
+	 * Closes the dock area and all dock widgets in this area
+	 */
+	void closeArea();
+
+	/**
+	 * Sets the dock area into auto hide mode or into normal mode.
+	 * If the dock area is switched to auto hide mode, then all dock widgets
+	 * that are pinable will be added to the sidebar
+	 */
+	void setAutoHide(bool Enable, SideBarLocation Location = SideBarNone, int TabIndex = -1);
+
+	/**
+	 * Switches the dock area to auto hide mode or vice versa depending on its
+	 * current state.
+	 */
+	void toggleAutoHide(SideBarLocation Location = SideBarNone);
+
+    /**
+	 * This function closes all other areas except of this area
+	 */
+	void closeOtherAreas();
+
+	/**
+	 * Moves the dock area into its own floating widget if the area
+	 * DockWidgetFloatable flag is true
+	 */
+	void setFloating();
+
+Q_SIGNALS:
+	/**
+	 * This signal is emitted when user clicks on a tab at an index.
+	 */
+	void tabBarClicked(int index);
+
+    /**
+     * This signal is emitted when the tab bar's current tab is about to be changed. The new
+     * current has the given index, or -1 if there isn't a new one.
+     * @param index
+     */
+    void currentChanging(int index);
+
+	/**
+	 * This signal is emitted when the tab bar's current tab changes. The new
+	 * current has the given index, or -1 if there isn't a new one
+	 * @param index
+	 */
+	void currentChanged(int index);
+
+	/**
+	 * This signal is emitted if the visibility of this dock area is toggled
+	 * via toggle view function
+	 */
+	void viewToggled(bool Open);
+}; // class DockAreaWidget
+} // namespace ads
+
+Q_DECLARE_OPERATORS_FOR_FLAGS(ads::CDockAreaWidget::DockAreaFlags)
+//-----------------------------------------------------------------------------
+#endif // DockAreaWidgetH
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\DockComponentsFactory.h
+==================================================
+#ifndef DockComponentsFactoryH
+#define DockComponentsFactoryH
+//============================================================================
+/// \file   DockComponentsFactory.h
+/// \author Uwe Kindler
+/// \date   10.02.2020
+/// \brief  Declaration of DockComponentsFactory
+//============================================================================
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include "ads_globals.h"
+
+namespace ads
+{
+class CDockWidgetTab;
+class CDockAreaTitleBar;
+class CDockAreaTabBar;
+class CDockAreaWidget;
+class CDockWidget;
+class CAutoHideTab;
+
+
+
+/**
+ * Factory for creation of certain GUI elements for the docking framework.
+ * A default unique instance provided by CDockComponentsFactory is used for
+ * creation of all supported components. To inject your custom components,
+ * you can create your own derived dock components factory and register
+ * it via setDefaultFactory() function.
+ * \code
+ * CDockComponentsFactory::setDefaultFactory(new MyComponentsFactory()));
+ * \endcode
+ */
+class ADS_EXPORT CDockComponentsFactory
+{
+public:
+	/**
+	 * Force virtual destructor
+	 */
+	virtual ~CDockComponentsFactory() {}
+
+	/**
+	 * This default implementation just creates a dock widget tab with
+	 * new CDockWidgetTab(DockWIdget).
+	 */
+	virtual CDockWidgetTab* createDockWidgetTab(CDockWidget* DockWidget) const;
+
+	/**
+	 * This default implementation just creates a dock widget side tab with
+	 * new CDockWidgetTab(DockWidget).
+	 */
+	virtual CAutoHideTab* createDockWidgetSideTab(CDockWidget* DockWidget) const;
+
+	/**
+	 * This default implementation just creates a dock area tab bar with
+	 * new CDockAreaTabBar(DockArea).
+	 */
+	virtual CDockAreaTabBar* createDockAreaTabBar(CDockAreaWidget* DockArea) const;
+
+	/**
+	 * This default implementation just creates a dock area title bar with
+	 * new CDockAreaTitleBar(DockArea).
+	 */
+	virtual CDockAreaTitleBar* createDockAreaTitleBar(CDockAreaWidget* DockArea) const;
+
+	/**
+	 * This returns the default dock components factory instance.
+	 * If no components factory is assigned to a specific dock manager, this
+	 * global factory instance will be used.
+	 */
+    static QSharedPointer<ads::CDockComponentsFactory> factory();
+
+	/**
+	 * Sets a new default factory for creation of GUI elements.
+	 * This function takes ownership of the given Factory.
+	 */
+	static void setFactory(CDockComponentsFactory* Factory);
+
+	/**
+	 * Resets the current factory to the
+	 */
+	static void resetDefaultFactory();
+};
+
+} // namespace ads
+
+//---------------------------------------------------------------------------
+#endif // DockComponentsFactoryH
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\DockContainerWidget.h
+==================================================
+#ifndef DockContainerWidgetH
+#define DockContainerWidgetH
+/*******************************************************************************
+** Qt Advanced Docking System
+** Copyright (C) 2017 Uwe Kindler
+**
+** This library is free software; you can redistribute it and/or
+** modify it under the terms of the GNU Lesser General Public
+** License as published by the Free Software Foundation; either
+** version 2.1 of the License, or (at your option) any later version.
+**
+** This library is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+** Lesser General Public License for more details.
+**
+** You should have received a copy of the GNU Lesser General Public
+** License along with this library; If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+
+//============================================================================
+/// \file   DockContainerWidget.h
+/// \author Uwe Kindler
+/// \date   24.02.2017
+/// \brief  Declaration of CDockContainerWidget class
+//============================================================================
+
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include <QFrame>
+
+#include "ads_globals.h"
+#include "AutoHideTab.h"
+#include "DockWidget.h"
+
+QT_FORWARD_DECLARE_CLASS(QXmlStreamWriter)
+
+
+namespace ads
+{
+class DockContainerWidgetPrivate;
+class CDockAreaWidget;
+class CDockWidget;
+class CDockManager;
+struct DockManagerPrivate;
+class CFloatingDockContainer;
+struct FloatingDockContainerPrivate;
+class CFloatingDragPreview;
+struct FloatingDragPreviewPrivate;
+class CDockingStateReader;
+class CAutoHideSideBar;
+class CAutoHideTab;
+class CDockSplitter;
+struct AutoHideTabPrivate;
+struct AutoHideDockContainerPrivate;
+
+
+/**
+ * Container that manages a number of dock areas with single dock widgets
+ * or tabified dock widgets in each area.
+ * Each window that support docking has a DockContainerWidget. That means
+ * the main application window and all floating windows contain a 
+ * DockContainerWidget instance.
+ */
+class ADS_EXPORT CDockContainerWidget : public QFrame
+{
+	Q_OBJECT
+private:
+	DockContainerWidgetPrivate* d; ///< private data (pimpl)
+    friend class DockContainerWidgetPrivate;
+	friend class CDockManager;
+	friend struct DockManagerPrivate;
+	friend class CDockAreaWidget;
+	friend struct DockAreaWidgetPrivate;
+	friend class CFloatingDockContainer;
+	friend struct FloatingDockContainerPrivate;
+	friend class CDockWidget;
+	friend class CFloatingDragPreview;
+	friend struct FloatingDragPreviewPrivate;
+	friend CAutoHideDockContainer;
+	friend CAutoHideTab;
+	friend AutoHideTabPrivate;
+	friend AutoHideDockContainerPrivate;
+	friend CAutoHideSideBar;
+
+protected:
+	/**
+	 * Handles activation events to update zOrderIndex
+	 */
+	virtual bool event(QEvent *e) override;
+
+	/**
+	 * Access function for the internal root splitter
+	 */
+	CDockSplitter* rootSplitter() const;
+
+	/**
+	 * Creates and initializes a dockwidget auto hide container into the given area.
+	 * Initializing inserts the tabs into the side tab widget and hides it
+	 * Returns nullptr if you try and insert into an area where the configuration is not enabled
+	 */
+	CAutoHideDockContainer* createAndSetupAutoHideContainer(SideBarLocation area, CDockWidget* DockWidget, int TabIndex = -1);
+
+	/**
+	 * Helper function for creation of the root splitter
+	 */
+	void createRootSplitter();
+
+	/**
+	 * Helper function for creation of the side tab bar widgets
+	 */
+	void createSideTabBarWidgets();
+
+	/**
+	 * Drop floating widget into the container
+	 */
+	void dropFloatingWidget(CFloatingDockContainer* FloatingWidget, const QPoint& TargetPos);
+
+	/**
+	 * Drop a dock area or a dock widget given in widget parameter.
+	 * If the TargetAreaWidget is a nullptr, then the DropArea indicates
+	 * the drop area for the container. If the given TargetAreaWidget is not
+	 * a nullptr, then the DropArea indicates the drop area in the given
+	 * TargetAreaWidget
+	 */
+	void dropWidget(QWidget* Widget, DockWidgetArea DropArea, CDockAreaWidget* TargetAreaWidget,
+		int TabIndex = -1);
+
+	/**
+	 * Adds the given dock area to this container widget
+	 */
+	void addDockArea(CDockAreaWidget* DockAreaWidget, DockWidgetArea area = ads::CenterDockWidgetArea);
+
+	/**
+	 * Removes the given dock area from this container
+	 */
+	void removeDockArea(CDockAreaWidget* area);
+
+	/**
+	 * Remove all dock areas and returns the list of removed dock areas
+	 */
+	QList<QPointer<CDockAreaWidget>> removeAllDockAreas();
+
+	/**
+	 * Saves the state into the given stream
+	 */
+	void saveState(QXmlStreamWriter& Stream) const;
+
+	/**
+	 * Restores the state from given stream.
+	 * If Testing is true, the function only parses the data from the given
+	 * stream but does not restore anything. You can use this check for
+	 * faulty files before you start restoring the state
+	 */
+	bool restoreState(CDockingStateReader& Stream, bool Testing);
+
+	/**
+	 * This function returns the last added dock area widget for the given
+	 * area identifier or 0 if no dock area widget has been added for the given
+	 * area
+	 */
+	CDockAreaWidget* lastAddedDockAreaWidget(DockWidgetArea area) const;
+
+	/**
+	 * If hasSingleVisibleDockWidget() returns true, this function returns the
+	 * one and only visible dock widget. Otherwise it returns a nullptr.
+	 */
+	CDockWidget* topLevelDockWidget() const;
+
+	/**
+	 * If the container has only one single visible dock area, then this
+	 * functions returns this top level dock area
+	 */
+	CDockAreaWidget* topLevelDockArea() const;
+
+    /**
+     * This function returns a list of all dock widgets in this floating widget.
+     * It may be possible, depending on the implementation, that dock widgets,
+     * that are not visible to the user have no parent widget. Therefore simply
+     * calling findChildren() would not work here. Therefore this function
+     * iterates over all dock areas and creates a list that contains all
+     * dock widgets returned from all dock areas.
+     */
+    QList<CDockWidget*> dockWidgets() const;
+
+    /**
+     * This function forces the dock container widget to update handles of splitters
+     * based on resize modes of dock widgets contained in the container.
+     */
+    void updateSplitterHandles(QSplitter* splitter);
+
+	/**
+	 * Registers the given floating widget in the internal list of
+	 * auto hide widgets
+	 */
+    void registerAutoHideWidget(CAutoHideDockContainer* AutoHideWidget);
+
+    /**
+	 * Remove the given auto hide widget from the list of registered auto hide
+	 * widgets
+	 */
+    void removeAutoHideWidget(CAutoHideDockContainer* AutoHideWidget);
+
+    /**
+     * Handles widget events of auto hide widgets to trigger delayed show
+     * or hide actions for auto hide container on auto hide tab mouse over
+     */
+    void handleAutoHideWidgetEvent(QEvent* e, QWidget* w);
+
+public:
+	/**
+	 * Default Constructor
+	 */
+	CDockContainerWidget(CDockManager* DockManager, QWidget* parent = 0);
+
+	/**
+	 * Virtual Destructor
+	 */
+    ~CDockContainerWidget() override;
+
+	/**
+	 * Adds dockwidget into the given area.
+	 * If DockAreaWidget is not null, then the area parameter indicates the area
+	 * into the DockAreaWidget. If DockAreaWidget is null, the Dockwidget will
+	 * be dropped into the container.
+	 * \return Returns the dock area widget that contains the new DockWidget
+	 */
+	CDockAreaWidget* addDockWidget(DockWidgetArea area, CDockWidget* Dockwidget,
+		CDockAreaWidget* DockAreaWidget = nullptr, int Index = -1);
+
+	/**
+	 * Removes dockwidget
+	 */
+	void removeDockWidget(CDockWidget* Dockwidget);
+
+	/**
+	 * Returns the current zOrderIndex
+	 */
+	virtual unsigned int zOrderIndex() const;
+
+	/**
+	 * This function returns true if this container widgets z order index is
+	 * higher than the index of the container widget given in Other parameter
+	 */
+	bool isInFrontOf(CDockContainerWidget* Other) const;
+
+	/**
+	 * Returns the dock area at the given global position or 0 if there is no
+	 * dock area at this position
+	 */
+	CDockAreaWidget* dockAreaAt(const QPoint& GlobalPos) const;
+
+	/**
+	 * Returns the dock area at the given Index or 0 if the index is out of
+	 * range
+	 */
+	CDockAreaWidget* dockArea(int Index) const;
+
+	/**
+	 * Returns the list of dock areas that are not closed
+	 * If all dock widgets in a dock area are closed, the dock area will be closed
+	 */
+	QList<CDockAreaWidget*> openedDockAreas() const;
+
+	/**
+	 * Returns a list for all open dock widgets in all open dock areas
+	 */
+	QList<CDockWidget*> openedDockWidgets() const;
+
+	/**
+	 * This function returns true, if the container has open dock areas.
+	 * This functions is a little bit faster than calling openedDockAreas().isEmpty()
+	 * because it returns as soon as it finds an open dock area
+	 */
+	bool hasOpenDockAreas() const;
+
+    /**
+     * This function returns true if this dock area has only one single
+     * visible dock widget.
+     * A top level widget is a real floating widget. Only the isFloating()
+     * function of top level widgets may returns true.
+     */
+    bool hasTopLevelDockWidget() const;
+
+	/**
+	 * Returns the number of dock areas in this container
+	 */
+	int dockAreaCount() const;
+
+	/**
+	 * Returns the number of visible dock areas
+	 */
+	int visibleDockAreaCount() const;
+
+	/**
+	 * This function returns true, if this container is in a floating widget
+	 */
+	bool isFloating() const;
+
+	/**
+	 * Dumps the layout for debugging purposes
+	 */
+	void dumpLayout();
+
+	/**
+	 * This functions returns the dock widget features of all dock widget in
+	 * this container.
+	 * A bitwise and is used to combine the flags of all dock widgets. That
+	 * means, if only dock widget does not support a certain flag, the whole
+	 * dock are does not support the flag.
+	 */
+	CDockWidget::DockWidgetFeatures features() const;
+
+	/**
+	 * If this dock container is in a floating widget, this function returns
+	 * the floating widget.
+	 * Else, it returns a nullptr.
+	 */
+	CFloatingDockContainer* floatingWidget() const;
+
+	/**
+	 * Call this function to close all dock areas except the KeepOpenArea
+	 */
+	void closeOtherAreas(CDockAreaWidget* KeepOpenArea);
+
+	/**
+	 * Returns the side tab widget for the given area
+	 */
+	CAutoHideSideBar* autoHideSideBar(SideBarLocation area) const;
+
+
+	/**
+	 * Access function for auto hide widgets
+	 */
+	QList<CAutoHideDockContainer*> autoHideWidgets() const;
+
+	/**
+	 * Returns the content rectangle without the autohide side bars
+	 */
+	QRect contentRect() const;
+
+	/**
+	 * Returns the content rectangle mapped to global space.
+	 * The content rectangle is the rectangle of the dock manager widget minus
+	 * the auto hide side bars. So that means, it is the geometry of the
+	 * internal root splitter mapped to global space.
+	 */
+	QRect contentRectGlobal() const;
+
+	/**
+	 * Returns the dock manager that owns this container
+	 */
+	CDockManager* dockManager() const;
+
+
+Q_SIGNALS:
+	/**
+	 * This signal is emitted if one or multiple dock areas has been added to
+	 * the internal list of dock areas.
+	 * If multiple dock areas are inserted, this signal is emitted only once
+	 */
+	void dockAreasAdded();
+
+	/**
+	 * This signal is emitted, if a new auto hide widget has been created.
+	 */
+	void autoHideWidgetCreated(ads::CAutoHideDockContainer* AutoHideWidget);
+
+	/**
+	 * This signal is emitted if one or multiple dock areas has been removed
+	 */
+	void dockAreasRemoved();
+
+	/**
+	 * This signal is emitted if a dock area is opened or closed via
+	 * toggleView() function
+	 */
+	void dockAreaViewToggled(ads::CDockAreaWidget* DockArea, bool Open);
+}; // class DockContainerWidget
+} // namespace ads
+//-----------------------------------------------------------------------------
+#endif // DockContainerWidgetH
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\DockFocusController.h
+==================================================
+#ifndef DockFocusControllerH
+#define DockFocusControllerH
+//============================================================================
+/// \file   DockFocusController.h
+/// \author Uwe Kindler
+/// \date   05.06.2020
+/// \brief  Declaration of CDockFocusController class
+//============================================================================
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include <QObject>
+#include "ads_globals.h"
+#include "DockManager.h"
+
+namespace ads
+{
+struct DockFocusControllerPrivate;
+class CDockManager;
+class CFloatingDockContainer;
+
+/**
+ * Manages focus styling of dock widgets and handling of focus changes
+ */
+class ADS_EXPORT CDockFocusController : public QObject
+{
+	Q_OBJECT
+private:
+	DockFocusControllerPrivate* d; ///< private data (pimpl)
+    friend struct DockFocusControllerPrivate;
+
+private Q_SLOTS:
+	void onApplicationFocusChanged(QWidget *old, QWidget *now);
+	void onFocusWindowChanged(QWindow *focusWindow);
+	void onFocusedDockAreaViewToggled(bool Open);
+	void onStateRestored();
+	void onDockWidgetVisibilityChanged(bool Visible);
+
+public:
+	using Super = QObject;
+	/**
+	 * Default Constructor
+	 */
+	CDockFocusController(CDockManager* DockManager);
+
+	/**
+	 * Virtual Destructor
+	 */
+	virtual ~CDockFocusController();
+
+	/**
+	 * A container needs to call this function if a widget has been dropped
+	 * into it
+	 */
+	void notifyWidgetOrAreaRelocation(QWidget* RelocatedWidget);
+
+	/**
+	 * This function is called, if a floating widget has been dropped into
+	 * an new position.
+	 * When this function is called, all dock widgets of the FloatingWidget
+	 * are already inserted into its new position
+	 */
+	void notifyFloatingWidgetDrop(CFloatingDockContainer* FloatingWidget);
+
+	/**
+	 * Returns the dock widget that has focus style in the ui or a nullptr if
+	 * not dock widget is painted focused.
+	 */
+	CDockWidget* focusedDockWidget() const;
+
+    /**
+     * Returns the dock area that contains the focusedDockWidget() or nullptr if
+     * the focused dock widget is not in this area.
+     */
+    CDockAreaWidget* focusedDockArea() const;
+
+	/**
+	 * Request focus highlighting for the given dock widget assigned to the tab
+	 * given in Tab parameter
+	 */
+	void setDockWidgetTabFocused(CDockWidgetTab* Tab);
+
+	/*
+	 * Request clear focus for a dock widget
+	 */
+	void clearDockWidgetFocus(CDockWidget* dockWidget);
+
+	/**
+	 * Notifies the dock focus controller, that a the mouse is pressed or
+	 * released
+	 */
+	void setDockWidgetTabPressed(bool Value);
+
+public Q_SLOTS:
+	/**
+	 * Request a focus change to the given dock widget
+	 */
+	void setDockWidgetFocused(CDockWidget* focusedNow);
+}; // class DockFocusController
+}
+ // namespace ads
+//-----------------------------------------------------------------------------
+#endif // DockFocusControllerH
+
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\DockingStateReader.h
+==================================================
+#ifndef DockingStateReaderH
+#define DockingStateReaderH
+//============================================================================
+/// \file   DockingStateReader.h
+/// \author Uwe Kindler
+/// \date   29.11.2019
+/// \brief  Declaration of CDockingStateReader
+//============================================================================
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include <QXmlStreamReader>
+
+namespace ads
+{
+
+/**
+ * Extends QXmlStreamReader with file version information
+ */
+class CDockingStateReader : public QXmlStreamReader
+{
+private:
+	int m_FileVersion;
+
+public:
+	using QXmlStreamReader::QXmlStreamReader;
+
+	/**
+	 * Set the file version for this state reader
+	 */
+	void setFileVersion(int FileVersion);
+
+	/**
+	 * Returns the file version set via setFileVersion
+	 */
+	int fileVersion() const;
+};
+
+} // namespace ads
+
+//---------------------------------------------------------------------------
+#endif // DockingStateReaderH
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\DockManager.h
+==================================================
+#ifndef DockManagerH
+#define DockManagerH
+/*******************************************************************************
+** Qt Advanced Docking System
+** Copyright (C) 2017 Uwe Kindler
+**
+** This library is free software; you can redistribute it and/or
+** modify it under the terms of the GNU Lesser General Public
+** License as published by the Free Software Foundation; either
+** version 2.1 of the License, or (at your option) any later version.
+**
+** This library is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+** Lesser General Public License for more details.
+**
+** You should have received a copy of the GNU Lesser General Public
+** License along with this library; If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+
+//============================================================================
+/// \file   DockManager.h
+/// \author Uwe Kindler
+/// \date   26.02.2017
+/// \brief  Declaration of CDockManager class
+//============================================================================
+
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include "ads_globals.h"
+#include "DockContainerWidget.h"
+#include "DockWidget.h"
+#include "FloatingDockContainer.h"
+
+
+QT_FORWARD_DECLARE_CLASS(QSettings)
+QT_FORWARD_DECLARE_CLASS(QMenu)
+
+namespace ads
+{
+struct DockManagerPrivate;
+class CFloatingDockContainer;
+struct FloatingDockContainerPrivate;
+class CDockContainerWidget;
+class DockContainerWidgetPrivate;
+class CDockOverlay;
+class CDockAreaTabBar;
+class CDockWidgetTab;
+struct DockWidgetTabPrivate;
+struct DockAreaWidgetPrivate;
+class CIconProvider;
+class CDockComponentsFactory;
+class CDockFocusController;
+class CAutoHideSideBar;
+class CAutoHideTab;
+struct AutoHideTabPrivate;
+
+/**
+ * The central dock manager that maintains the complete docking system.
+ * With the configuration flags you can globally control the functionality
+ * of the docking system. The dock manager uses an internal stylesheet to
+ * style its components like splitters, tabs and buttons. If you want to
+ * disable this stylesheet because your application uses its own,
+ * just call the function for settings the stylesheet with an empty
+ * string.
+ * \code
+ * DockManager->setStyleSheet("");
+ * \endcode
+ **/
+class ADS_EXPORT CDockManager : public CDockContainerWidget
+{
+	Q_OBJECT
+private:
+	DockManagerPrivate* d; ///< private data (pimpl)
+	friend struct DockManagerPrivate;
+	friend class CFloatingDockContainer;
+	friend struct FloatingDockContainerPrivate;
+	friend class CDockContainerWidget;
+	friend class DockContainerWidgetPrivate;
+	friend class CDockAreaTabBar;
+	friend class CDockWidgetTab;
+	friend struct DockAreaWidgetPrivate;
+	friend struct DockWidgetTabPrivate;
+	friend class CFloatingDragPreview;
+	friend struct FloatingDragPreviewPrivate;
+	friend class CDockAreaTitleBar;
+	friend class CAutoHideDockContainer;
+	friend CAutoHideSideBar;
+	friend CAutoHideTab;
+	friend AutoHideTabPrivate;
+
+public Q_SLOTS:
+	/**
+	 * Ends the isRestoringFromMinimizedState
+	 */
+	void endLeavingMinimizedState();
+
+
+protected:
+	/**
+	 * Registers the given floating widget in the internal list of
+	 * floating widgets
+	 */
+	void registerFloatingWidget(CFloatingDockContainer* FloatingWidget);
+
+	/**
+	 * Remove the given floating widget from the list of registered floating
+	 * widgets
+	 */
+	void removeFloatingWidget(CFloatingDockContainer* FloatingWidget);
+
+	/**
+	 * Registers the given dock container widget
+	 */
+	void registerDockContainer(CDockContainerWidget* DockContainer);
+
+	/**
+	 * Remove dock container from the internal list of registered dock
+	 * containers
+	 */
+	void removeDockContainer(CDockContainerWidget* DockContainer);
+
+	/**
+	 * Overlay for containers
+	 */
+	CDockOverlay* containerOverlay() const;
+
+	/**
+	 * Overlay for dock areas
+	 */
+	CDockOverlay* dockAreaOverlay() const;
+
+
+	/**
+	 * A container needs to call this function if a widget has been dropped
+	 * into it
+	 */
+	void notifyWidgetOrAreaRelocation(QWidget* RelocatedWidget);
+
+	/**
+	 * This function is called, if a floating widget has been dropped into
+	 * an new position.
+	 * When this function is called, all dock widgets of the FloatingWidget
+	 * are already inserted into its new position
+	 */
+	void notifyFloatingWidgetDrop(CFloatingDockContainer* FloatingWidget);
+
+	/**
+	 * Show the floating widgets that has been created floating
+	 */
+	virtual void showEvent(QShowEvent *event) override;
+
+	/**
+	 * Access for the internal dock focus controller.
+	 * This function only returns a valid object, if the FocusHighlighting
+	 * flag is set.
+	 */
+	CDockFocusController* dockFocusController() const;
+
+    /**
+     * Restore floating widgets hidden by an earlier call to hideManagerAndFloatingWidgets.
+     */
+    void restoreHiddenFloatingWidgets();
+
+public:
+	using Super = CDockContainerWidget;
+
+	enum eViewMenuInsertionOrder
+	{
+		MenuSortedByInsertion,
+		MenuAlphabeticallySorted
+	};
+
+	/**
+	 * These global configuration flags configure some global dock manager
+	 * settings.
+	 * Set the dock manager flags, before you create the dock manager instance.
+	 */
+	enum eConfigFlag
+	{
+		ActiveTabHasCloseButton = 0x0001,    //!< If this flag is set, the active tab in a tab area has a close button
+		DockAreaHasCloseButton = 0x0002,     //!< If the flag is set each dock area has a close button
+		DockAreaCloseButtonClosesTab = 0x0004,//!< If the flag is set, the dock area close button closes the active tab, if not set, it closes the complete dock area
+		OpaqueSplitterResize = 0x0008, //!< See QSplitter::setOpaqueResize() documentation
+		XmlAutoFormattingEnabled = 0x0010,//!< If enabled, the XML writer automatically adds line-breaks and indentation to empty sections between elements (ignorable whitespace).
+		XmlCompressionEnabled = 0x0020,//!< If enabled, the XML output will be compressed and is not human readable anymore
+		TabCloseButtonIsToolButton = 0x0040,//! If enabled the tab close buttons will be QToolButtons instead of QPushButtons - disabled by default
+		AllTabsHaveCloseButton = 0x0080, //!< if this flag is set, then all tabs that are closable show a close button
+		RetainTabSizeWhenCloseButtonHidden = 0x0100, //!< if this flag is set, the space for the close button is reserved even if the close button is not visible
+		DragPreviewIsDynamic = 0x0400,///< If opaque undocking is disabled, this flag defines the behavior of the drag preview window, if this flag is enabled, the preview will be adjusted dynamically to the drop area
+		DragPreviewShowsContentPixmap = 0x0800,///< If opaque undocking is disabled, the created drag preview window shows a copy of the content of the dock widget / dock are that is dragged
+		DragPreviewHasWindowFrame = 0x1000,///< If opaque undocking is disabled, then this flag configures if the drag preview is frameless or looks like a real window
+		AlwaysShowTabs = 0x2000,///< If this option is enabled, the tab of a dock widget is always displayed - even if it is the only visible dock widget in a floating widget.
+		DockAreaHasUndockButton = 0x4000,     //!< If the flag is set each dock area has an undock button
+		DockAreaHasTabsMenuButton = 0x8000,     //!< If the flag is set each dock area has a tabs menu button
+		DockAreaHideDisabledButtons = 0x10000,    //!< If the flag is set disabled dock area buttons will not appear on the toolbar at all (enabling them will bring them back)
+		DockAreaDynamicTabsMenuButtonVisibility = 0x20000, //!< If the flag is set, the tabs menu button will be shown only when it is required - that means, if the tabs are elided. If the tabs are not elided, it is hidden
+		FloatingContainerHasWidgetTitle = 0x40000, //!< If set, the Floating Widget window title reflects the title of the current dock widget otherwise it displays the title set with `CDockManager::setFloatingContainersTitle` or application name as window title
+		FloatingContainerHasWidgetIcon = 0x80000, //!< If set, the Floating Widget icon reflects the icon of the current dock widget otherwise it displays application icon
+		HideSingleCentralWidgetTitleBar = 0x100000, //!< If there is only one single visible dock widget in the main dock container (the dock manager) and if this flag is set, then the titlebar of this dock widget will be hidden
+		                                            //!< this only makes sense for non draggable and non floatable widgets and enables the creation of some kind of "central" widget
+
+		FocusHighlighting = 0x200000, //!< enables styling of focused dock widget tabs or floating widget titlebar
+		EqualSplitOnInsertion = 0x400000, ///!< if enabled, the space is equally distributed to all widgets in a  splitter
+
+		FloatingContainerForceNativeTitleBar = 0x800000, //!< Linux only ! Forces all FloatingContainer to use the native title bar. This might break docking for FloatinContainer on some Window Managers (like Kwin/KDE).
+														 //!< If neither this nor FloatingContainerForceCustomTitleBar is set (the default) native titlebars are used except on known bad systems.
+														 //! Users can overwrite this by setting the environment variable ADS_UseNativeTitle to "1" or "0".
+        FloatingContainerForceQWidgetTitleBar = 0x1000000,//!< Linux only ! Forces all FloatingContainer to use a QWidget based title bar.
+														 //!< If neither this nor FloatingContainerForceNativeTitleBar is set (the default) native titlebars are used except on known bad systems.
+														 //! Users can overwrite this by setting the environment variable ADS_UseNativeTitle to "1" or "0".
+		MiddleMouseButtonClosesTab = 0x2000000, //! If the flag is set, the user can use the mouse middle button to close the tab under the mouse
+		DisableTabTextEliding =      0x4000000, //! Set this flag to disable eliding of tab texts in dock area tabs
+		ShowTabTextOnlyForActiveTab =0x8000000, //! Set this flag to show label texts in dock area tabs only for active tabs
+		DoubleClickUndocksWidget = 0x10000000, //!< If the flag is set, a double click on a tab undocks the widget
+		TabsAtBottom = 0x20000000, //!< If the flag is set, tabs will be shown at the bottom instead of in the title bar.
+		UseNativeWindows = 0x40000000, //!< If the flag is set, windows for the dock and area widgets will be native.
+
+
+        DefaultDockAreaButtons = DockAreaHasCloseButton
+							   | DockAreaHasUndockButton
+		                       | DockAreaHasTabsMenuButton, ///< default configuration of dock area title bar buttons
+
+		DefaultBaseConfig = DefaultDockAreaButtons
+		                  | ActiveTabHasCloseButton
+		                  | XmlCompressionEnabled
+		                  | FloatingContainerHasWidgetTitle
+		                  | DoubleClickUndocksWidget, ///< default base configuration settings
+
+        DefaultOpaqueConfig = DefaultBaseConfig
+		                    | OpaqueSplitterResize
+		                    | DragPreviewShowsContentPixmap, ///< the default configuration for non opaque operations
+
+		DefaultNonOpaqueConfig = DefaultBaseConfig
+		              | DragPreviewShowsContentPixmap, ///< the default configuration for non opaque operations
+
+		NonOpaqueWithWindowFrame = DefaultNonOpaqueConfig
+		              | DragPreviewHasWindowFrame ///< the default configuration for non opaque operations that show a real window with frame
+	};
+	Q_DECLARE_FLAGS(ConfigFlags, eConfigFlag)
+
+
+	/**
+	 * These global configuration flags configure some dock manager auto hide
+	 * settings
+	 * Set the dock manager flags, before you create the dock manager instance.
+	 */
+    enum eAutoHideFlag
+	{
+		AutoHideFeatureEnabled = 0x01, //!< enables / disables auto hide feature
+		DockAreaHasAutoHideButton = 0x02,     //!< If the flag is set each dock area has a auto hide menu button
+		AutoHideButtonTogglesArea = 0x04, //!< If the flag is set, the auto hide button enables auto hiding for all dock widgets in an area, if disabled, only the current dock widget will be toggled
+		AutoHideButtonCheckable = 0x08, //!< If the flag is set, the auto hide button will be checked and unchecked depending on the auto hide state. Mainly for styling purposes.
+		AutoHideSideBarsIconOnly = 0x10,///< show only icons in auto hide side tab - if a tab has no icon, then the text will be shown
+		AutoHideShowOnMouseOver = 0x20, ///< show the auto hide window on mouse over tab and hide it if mouse leaves auto hide container
+		AutoHideCloseButtonCollapsesDock = 0x40, ///< Close button of an auto hide container collapses the dock instead of hiding it completely
+		AutoHideHasCloseButton = 0x80, //< If the flag is set an auto hide title bar has a close button
+		AutoHideHasMinimizeButton = 0x100, ///< if this flag is set, the auto hide title bar has a minimize button to collapse the dock widget
+        AutoHideOpenOnDragHover = 0x200,  ///< if this flag is set, dragging hover the tab bar will open the dock
+        AutoHideCloseOnOutsideMouseClick = 0x400, ///< if this flag is set, the auto hide dock container will collapse if the user clicks outside of the container, if not set, the auto hide container can be closed only via click on sidebar tab
+
+		DefaultAutoHideConfig = AutoHideFeatureEnabled
+			                  | DockAreaHasAutoHideButton
+			                  | AutoHideHasMinimizeButton
+			                  | AutoHideCloseOnOutsideMouseClick
+
+	};
+    Q_DECLARE_FLAGS(AutoHideFlags, eAutoHideFlag)
+
+	/**
+	 * Global configuration parameters that you can set via setConfigParam()
+	 */
+	enum eConfigParam
+	{
+    	AutoHideOpenOnDragHoverDelay_ms, ///< Delay in ms before the dock opens on drag hover if AutoHideOpenOnDragHover flag is set
+    	ConfigParamCount // just a delimiter to count number of config params
+	};
+
+
+	/**
+	 * Default Constructor.
+	 * If the given parent is a QMainWindow, the dock manager sets itself as the
+	 * central widget.
+	 * Before you create any dock widgets, you should properly setup the
+	 * configuration flags via setConfigFlags().
+	 */
+	CDockManager(QWidget* parent = nullptr);
+
+	/**
+	 * Virtual Destructor
+	 */
+	virtual ~CDockManager() override;
+
+    /**
+     * Creates a new dock widget with the specified title and optional parent
+     * widget.
+     *
+     * The new dock widget will be managed by the dock manager, and its lifetime
+     * will be tied to the dock manager. If a parent widget is provided, the dock
+     * widget will be created as a child of the parent widget. If no parent widget
+     * is provided, the dock widget will be created as a top-level widget.
+     *
+     * @param title The title of the dock widget.
+     * @param parent The parent widget, if any. Defaults to nullptr.
+     * @return Returns a pointer to the created CDockWidget.
+     */
+    CDockWidget *createDockWidget(const QString &title, QWidget* parent = nullptr);
+
+	/**
+	 * Returns the dock manager specific factory for creating components of
+	 * fock widgets
+	 */
+    QSharedPointer<ads::CDockComponentsFactory> componentsFactory() const;
+
+    /**
+     * Sets a custom factory for creating components of dock widgets.
+     * The pointer is stored internally into a shared pointer so you should not
+     * delete the given factory object as long as it is used by the dock manager.
+     */
+    void setComponentsFactory(ads::CDockComponentsFactory* Factory);
+
+    /**
+     * Sets a custom factory for creating components of dock widgets.
+     */
+    void setComponentsFactory(QSharedPointer<ads::CDockComponentsFactory>);
+
+	/**
+	 * This function returns the global configuration flags
+	 */
+	static ConfigFlags configFlags();
+
+	/**
+	 * This function returns the auto hide configuration flags
+	 */
+	static AutoHideFlags autoHideConfigFlags();
+
+	/**
+	 * Sets the global configuration flags for the whole docking system.
+	 * Call this function before you create the dock manager and before
+	 * your create the first dock widget.
+	 */
+	static void setConfigFlags(const ConfigFlags Flags);
+
+	/**
+	 * Sets the global configuration flags for the whole docking system.
+	 * Call this function before you create the dock manager and before
+	 * your create the first dock widget.
+	 */
+	static void setAutoHideConfigFlags(const AutoHideFlags Flags);
+
+	/**
+	 * Set a certain config flag.
+	 * \see setConfigFlags()
+	 */
+	static void setConfigFlag(eConfigFlag Flag, bool On = true);
+
+	/**
+	 * Set a certain overlay config flag.
+	 * \see setConfigFlags()
+	 */
+	static void setAutoHideConfigFlag(eAutoHideFlag Flag, bool On = true);
+
+	/**
+	 * Returns true if the given config flag is set
+	 */
+	static bool testConfigFlag(eConfigFlag Flag);
+
+	/**
+	 * Returns true if the given overlay config flag is set
+	 */
+	static bool testAutoHideConfigFlag(eAutoHideFlag Flag);
+
+	/**
+	 * Sets the value for the given config parameter
+	 */
+	static void setConfigParam(eConfigParam Param, QVariant Value);
+
+	/**
+	 * Returns the value for the given config parameter or the default value
+	 * if the parameter is not set.
+	 */
+	static QVariant configParam(eConfigParam Param, QVariant Default);
+
+	/**
+	 * Returns the global icon provider.
+	 * The icon provider enables the use of custom icons in case using
+	 * styleheets for icons is not an option.
+	 */
+	static CIconProvider& iconProvider();
+
+	/**
+	 * Adds dockwidget into the given area.
+	 * If DockAreaWidget is not null, then the area parameter indicates the area
+	 * into the DockAreaWidget. If DockAreaWidget is null, the Dockwidget will
+	 * be dropped into the container. If you would like to add a dock widget
+	 * tabified, then you need to add it to an existing dock area object
+	 * into the CenterDockWidgetArea. The following code shows this:
+	 * \code
+	 * DockManager->addDockWidget(ads::CenterDockWidgetArea, NewDockWidget,
+	 * 	   ExisitingDockArea);
+	 * \endcode
+	 * \return Returns the dock area widget that contains the new DockWidget
+	 */
+	CDockAreaWidget* addDockWidget(DockWidgetArea area, CDockWidget* Dockwidget,
+		CDockAreaWidget* DockAreaWidget = nullptr, int Index = -1);
+
+	/**
+	 * Adds dockwidget into the given container.
+	 * This allows you to place the dock widget into a container, even if that
+	 * container does not yet contain a DockAreaWidget.
+	 * \return Returns the dock area widget that contains the new DockWidget
+	 */
+	CDockAreaWidget* addDockWidgetToContainer(DockWidgetArea area, CDockWidget* Dockwidget,
+		CDockContainerWidget* DockContainerWidget);
+
+	/**
+	 * Adds an Auto-Hide widget to the dock manager container pinned to
+	 * the given side bar location.
+	 * \return Returns the CAutoHideDockContainer that contains the new DockWidget
+	 */
+	CAutoHideDockContainer* addAutoHideDockWidget(SideBarLocation Location, CDockWidget* Dockwidget);
+
+	/**
+	 * Adds an Auto-Hide widget to the given DockContainerWidget pinned to
+	 * the given side bar location in this container.
+	 * \return Returns the CAutoHideDockContainer that contains the new DockWidget
+	 */
+	CAutoHideDockContainer* addAutoHideDockWidgetToContainer(SideBarLocation Location,
+		CDockWidget* Dockwidget, CDockContainerWidget* DockContainerWidget);
+
+	/**
+	 * This function will add the given Dockwidget to the given dock area as
+	 * a new tab.
+	 * If no dock area widget exists for the given area identifier, a new
+	 * dock area widget is created.
+	 */
+	CDockAreaWidget* addDockWidgetTab(DockWidgetArea area,
+		CDockWidget* Dockwidget);
+
+	/**
+	 * This function will add the given Dockwidget to the given DockAreaWidget
+	 * as a new tab.
+	 * If index is out of range, the tab is simply appended. Otherwise it is
+	 * inserted at the specified position.
+	 */
+	CDockAreaWidget* addDockWidgetTabToArea(CDockWidget* Dockwidget,
+		CDockAreaWidget* DockAreaWidget, int Index = -1);
+
+	/**
+	 * Adds the given DockWidget floating and returns the created
+	 * CFloatingDockContainer instance.
+	 */
+	CFloatingDockContainer* addDockWidgetFloating(CDockWidget* Dockwidget);
+
+	/**
+	 * Searches for a registered doc widget with the given ObjectName
+	 * \return Return the found dock widget or nullptr if a dock widget with the
+	 * given name is not registered
+	 */
+	CDockWidget* findDockWidget(const QString& ObjectName) const;
+
+	/**
+	 * Remove the given Dock from the dock manager
+	 */
+	void removeDockWidget(CDockWidget* Dockwidget);
+
+	/**
+	 * This function returns a readable reference to the internal dock
+	 * widgets map so that it is possible to iterate over all dock widgets
+	 */
+	QMap<QString, CDockWidget*> dockWidgetsMap() const;
+
+	/**
+	 * Returns the list of all active and visible dock containers
+	 * Dock containers are the main dock manager and all floating widgets
+	 */
+	const QList<CDockContainerWidget*> dockContainers() const;
+
+	/**
+	 * Returns the list of all floating widgets
+	 */
+	const QList<CFloatingDockContainer*> floatingWidgets() const;
+
+	/**
+	 * This function always return 0 because the main window is always behind
+	 * any floating widget
+	 */
+	unsigned int zOrderIndex() const override;
+
+	/**
+	 * Saves the current state of the dockmanger and all its dock widgets
+	 * into the returned QByteArray.
+	 * The XmlMode enables / disables the auto formatting for the XmlStreamWriter.
+	 * If auto formatting is enabled, the output is intended and line wrapped.
+	 * The XmlMode XmlAutoFormattingDisabled is better if you would like to have
+	 * a more compact XML output - i.e. for storage in ini files.
+	 * The version number is stored as part of the data.
+	 * To restore the saved state, pass the return value and version number
+	 * to restoreState().
+	 * \see restoreState()
+	 */
+	QByteArray saveState(int version = 0) const;
+
+	/**
+	 * Restores the state of this dockmanagers dockwidgets.
+	 * The version number is compared with that stored in state. If they do
+	 * not match, the dockmanager's state is left unchanged, and this function
+	 * returns false; otherwise, the state is restored, and this function
+	 * returns true.
+	 * \see saveState()
+	 */
+	bool restoreState(const QByteArray &state, int version = 0);
+
+	/**
+	 * Saves the current perspective to the internal list of perspectives.
+	 * A perspective is the current state of the dock manager assigned
+	 * with a certain name. This makes it possible for the user,
+	 * to switch between different perspectives quickly.
+	 * If a perspective with the given name already exists, then
+	 * it will be overwritten with the new state.
+	 */
+	void addPerspective(const QString& UniquePrespectiveName);
+
+	/**
+	 * Removes the perspective with the given name from the list of perspectives
+	 */
+	void removePerspective(const QString& Name);
+
+	/**
+	 * Removes the given perspectives from the dock manager
+	 */
+	void removePerspectives(const QStringList& Names);
+
+	/**
+	 * Returns the names of all available perspectives
+	 */
+	QStringList perspectiveNames() const;
+
+	/**
+	 * Saves the perspectives to the given settings file.
+	 */
+	void savePerspectives(QSettings& Settings) const;
+
+	/**
+	 * Loads the perspectives from the given settings file
+	 */
+	void loadPerspectives(QSettings& Settings);
+
+    /**
+     * This function returns managers central widget or nullptr if no central widget is set.
+     */
+    CDockWidget* centralWidget() const;
+
+    /**
+     * Adds dockwidget widget into the central area and marks it as central widget.
+     * If central widget is set, it will be the only dock widget
+     * that will resize with the dock container. A central widget if not
+     * movable, floatable or closable and the titlebar of the central
+     * dock area is not visible.
+     * If the given widget could be set as central widget, the function returns
+     * the created dock area. If the widget could not be set, because there
+     * is already a central widget, this function returns a nullptr.
+     * To clear the central widget, pass a nullptr to the function.
+     * \note Setting a central widget is only possible if no other dock widgets
+     * have been registered before. That means, this function should be the
+     * first function that you call before you add other dock widgets.
+     * \retval != 0 The dock area that contains the central widget
+     * \retval nullptr Indicates that the given widget can not be set as central
+     *         widget because there is already a central widget.
+     */
+    CDockAreaWidget* setCentralWidget(CDockWidget* widget);
+
+    /**
+	 * Adds a toggle view action to the the internal view menu.
+	 * You can either manage the insertion of the toggle view actions in your
+	 * application or you can add the actions to the internal view menu and
+	 * then simply insert the menu object into your.
+	 * \param[in] ToggleViewAction The action to insert. If no group is provided
+	 *            the action is directly inserted into the menu. If a group
+	 *            is provided, the action is inserted into the group and the
+	 *            group is inserted into the menu if it is not existing yet.
+	 * \param[in] Group This is the text used for the group menu item
+	 * \param[in] GroupIcon The icon used for grouping the workbenches in the
+	 *            view menu. I.e. if there is a workbench for each device
+	 *            like for spectrometer devices, it is good to group all these
+	 *            workbenches under a menu item
+	 * \return If Group is not empty, this function returns the GroupAction
+	 *         for this group. If the group is empty, the function returns
+	 *         the given ToggleViewAction.
+	 */
+	QAction* addToggleViewActionToMenu(QAction* ToggleViewAction,
+		const QString& Group = QString(), const QIcon& GroupIcon = QIcon());
+
+	/**
+	 * This function returns the internal view menu.
+	 * To fill the view menu, you can use the addToggleViewActionToMenu()
+	 * function.
+	 */
+	QMenu* viewMenu() const;
+
+	/**
+	 * Define the insertion order for toggle view menu items.
+	 * The order defines how the actions are added to the view menu.
+	 * The default insertion order is MenuAlphabeticallySorted to make it
+	 * easier for users to find the menu entry for a certain dock widget.
+	 * You need to call this function before you insert the first menu item
+	 * into the view menu.
+	 */
+	void setViewMenuInsertionOrder(eViewMenuInsertionOrder Order);
+
+	/**
+	 * This function returns true between the restoringState() and
+	 * stateRestored() signals.
+	 */
+	bool isRestoringState() const;
+
+	/**
+	 * This function returns true, if the DockManager window is restoring from
+	 * minimized state.
+	 * The DockManager is in this state starting from the QWindowStateChangeEvent
+	 * that signals the state change from minimized to normal until
+	 * endLeavingMinimizedState() function is called.
+	 */
+	bool isLeavingMinimizedState() const;
+
+	/**
+	 * The distance the user needs to move the mouse with the left button
+	 * hold down before a dock widget start floating
+	 */
+	static int startDragDistance();
+
+	/**
+	 * Helper function to set focus depending on the configuration of the
+	 * FocusStyling flag
+	 */
+	template <class QWidgetPtr>
+	static void setWidgetFocus(QWidgetPtr widget)
+	{
+		if (!CDockManager::testConfigFlag(CDockManager::FocusHighlighting))
+		{
+			return;
+		}
+
+		widget->setFocus(Qt::OtherFocusReason);
+	}
+
+	bool eventFilter(QObject *obj, QEvent *e) override;
+
+	/**
+	 * Returns the dock widget that has focus style in the ui or a nullptr if
+	 * not dock widget is painted focused.
+	 * If the flag FocusHighlighting is disabled, this function always returns
+	 * nullptr.
+	 */
+	CDockWidget* focusedDockWidget() const;
+
+    /**
+     * Returns the sizes of the splitter that contains the dock area.
+     *
+     * If there is no splitter that contains the area, an empty list will be
+     * returned.
+     */
+    QList<int> splitterSizes(CDockAreaWidget *ContainedArea) const;
+
+    /**
+     * Update the sizes of a splitter
+     * Programmatically updates the sizes of a given splitter by calling
+     * QSplitter::setSizes(). The splitter will be the splitter that
+     * contains the supplied dock area widget. If there is not splitter
+     * that contains the dock area, or the sizes supplied does not match
+     * the number of children of the splitter, this method will have no
+     * effect.
+     */
+    void setSplitterSizes(CDockAreaWidget *ContainedArea, const QList<int>& sizes);
+
+	/**
+	 * Set a custom title for all FloatingContainer that does not reflect
+	 * the title of the current dock widget.
+	 */
+	static void setFloatingContainersTitle(const QString& Title);
+
+	/**
+	 * Returns the title used by all FloatingContainer that does not
+	 * reflect the title of the current dock widget.
+	 *
+	 * If not title was set with setFloatingContainersTitle(), it returns
+	 * QGuiApplication::applicationDisplayName().
+	 */
+	static QString floatingContainersTitle();
+
+    /**
+     * This function sets the tool button style for the given dock widget state.
+     * It is possible to switch the tool button style depending on the state.
+     * If a dock widget is floating, then here are more space and it is
+     * possible to select a style that requires more space like
+     * Qt::ToolButtonTextUnderIcon. For the docked state Qt::ToolButtonIconOnly
+     * might be better.
+     */
+    void setDockWidgetToolBarStyle(Qt::ToolButtonStyle Style, CDockWidget::eState State);
+
+    /**
+     * Returns the tool button style for the given docking state.
+     * \see setToolBarStyle()
+     */
+    Qt::ToolButtonStyle dockWidgetToolBarStyle(CDockWidget::eState State) const;
+
+    /**
+     * This function sets the tool button icon size for the given state.
+     * If a dock widget is floating, there is more space and increasing the
+     * icon size is possible. For docked widgets, small icon sizes, eg. 16 x 16
+     * might be better.
+     */
+    void setDockWidgetToolBarIconSize(const QSize& IconSize, CDockWidget::eState State);
+
+    /**
+     * Returns the icon size for a given docking state.
+     * \see setToolBarIconSize()
+     */
+    QSize dockWidgetToolBarIconSize(CDockWidget::eState State) const;
+
+    /**
+     * Returns all dock widget features that are globally locked by the dock
+     * manager.
+     * Globally locked features are removed from the features of all dock
+     * widgets.
+     */
+    CDockWidget::DockWidgetFeatures globallyLockedDockWidgetFeatures() const;
+
+    /**
+     * Globally Lock features of all dock widgets to "freeze" the current
+     * workspace layout.
+     * For example, it is now possible to lock the workspace to avoid
+     * accidentally dragging a docked view. Locking wasn’t possible before.
+     * So, users had to manually dock it back to the desired place after
+     * each accidental undock.
+     * You can use a combination of the following feature flags:
+     * - CDockWidget::DockWidgetClosable
+     * - CDockWidget::DockWidgetMovable
+     * - CDockWidget::DockWidgetFloatable
+     * - CDockWidget::DockWidgetPinable
+     *
+     * To clear the locked features, you can use CDockWidget::NoDockWidgetFeatures
+     * The following code shows how to lock and unlock dock widget features
+     * globally.
+     *
+     * \code
+     * DockManager->lockDockWidgetFeaturesGlobally();
+     * DockManager->lockDockWidgetFeaturesGlobally(CDockWidget::NoDockWidgetFeatures);
+     * \code
+     */
+    void lockDockWidgetFeaturesGlobally(CDockWidget::DockWidgetFeatures Features = CDockWidget::GloballyLockableFeatures);
+
+public Q_SLOTS:
+	/**
+	 * Opens the perspective with the given name.
+	 */
+	void openPerspective(const QString& PerspectiveName);
+
+	/**
+	 * Request a focus change to the given dock widget.
+	 * This function only has an effect, if the flag CDockManager::FocusStyling
+	 * is enabled
+	 */
+	void setDockWidgetFocused(CDockWidget* DockWidget);
+
+    /**
+     * hide CDockManager and all floating widgets (See Issue #380). Calling regular QWidget::hide()
+     * hides the CDockManager but not the floating widgets;
+     */
+    void hideManagerAndFloatingWidgets();
+
+    /**
+     * Calls raise() for the widget that hosts this dock manager.
+     * This will bring the widget in front of any other application that is running
+     */
+    void raise();
+
+Q_SIGNALS:
+	/**
+	 * This signal is emitted if the list of perspectives changed.
+	 * The list of perspectives changes if perspectives are added, removed
+	 * or if the perspective list has been loaded
+	 */
+	void perspectiveListChanged();
+
+	/**
+	 * This signal is emitted if the perspective list has been loaded
+	 */
+	void perspectiveListLoaded();
+
+	/**
+	 * This signal is emitted if perspectives have been removed
+	 */
+	void perspectivesRemoved();
+
+	/**
+	 * This signal is emitted, if the restore function is called, just before
+	 * the dock manager starts restoring the state.
+	 * If this function is called, nothing has changed yet
+	 */
+	void restoringState();
+
+    /**
+     * This signal is emitted if the state changed in restoreState.
+     * The signal is emitted if the restoreState() function is called or
+     * if the openPerspective() function is called
+     */
+    void stateRestored();
+
+    /**
+     * This signal is emitted, if the dock manager starts opening a
+     * perspective.
+     * Opening a perspective may take more than a second if there are
+     * many complex widgets. The application may use this signal
+     * to show some progress indicator or to change the mouse cursor
+     * into a busy cursor.
+     */
+    void openingPerspective(const QString& PerspectiveName);
+
+    /**
+     * This signal is emitted if the dock manager finished opening a
+     * perspective.
+     */
+    void perspectiveOpened(const QString& PerspectiveName);
+
+	/**
+	 * This signal is emitted, if a new floating widget has been created.
+	 * An application can use this signal to e.g. subscribe to events of
+	 * the newly created window.
+	 */
+	void floatingWidgetCreated(ads::CFloatingDockContainer* FloatingWidget);
+
+    /**
+     * This signal is emitted, if a new DockArea has been created.
+     * An application can use this signal to set custom icons or custom
+     * tooltips for the DockArea buttons.
+     */
+    void dockAreaCreated(ads::CDockAreaWidget* DockArea);
+
+    /**
+     * This signal is emitted if a dock widget has been added to this
+     * dock manager instance.
+     */
+    void dockWidgetAdded(ads::CDockWidget* DockWidget);
+
+    /**
+     * This signal is emitted just before the given dock widget is removed
+     * from the dock manager
+     */
+    void dockWidgetAboutToBeRemoved(ads::CDockWidget* DockWidget);
+
+    /**
+     * This signal is emitted if a dock widget has been removed with the remove
+     * removeDockWidget() function.
+     * If this signal is emitted, the dock widget has been removed from the
+     * docking system but it is not deleted yet.
+     */
+    void dockWidgetRemoved(ads::CDockWidget* DockWidget);
+
+    /**
+     * This signal is emitted if the focused dock widget changed.
+     * Both old and now can be nullptr.
+     * The focused dock widget is the one that is highlighted in the GUI
+     */
+    void focusedDockWidgetChanged(ads::CDockWidget* old, ads::CDockWidget* now);
+}; // class DockManager
+} // namespace ads
+
+Q_DECLARE_OPERATORS_FOR_FLAGS(ads::CDockManager::ConfigFlags)
+//-----------------------------------------------------------------------------
+#endif // DockManagerH
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\DockOverlay.h
+==================================================
+#ifndef DockOverlayH
+#define DockOverlayH
+/*******************************************************************************
+** Qt Advanced Docking System
+** Copyright (C) 2017 Uwe Kindler
+**
+** This library is free software; you can redistribute it and/or
+** modify it under the terms of the GNU Lesser General Public
+** License as published by the Free Software Foundation; either
+** version 2.1 of the License, or (at your option) any later version.
+**
+** This library is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+** Lesser General Public License for more details.
+**
+** You should have received a copy of the GNU Lesser General Public
+** License along with this library; If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include <QPointer>
+#include <QHash>
+#include <QRect>
+#include <QFrame>
+
+#include "ads_globals.h"
+
+QT_FORWARD_DECLARE_CLASS(QGridLayout)
+
+namespace ads
+{
+struct DockOverlayPrivate;
+class CDockOverlayCross;
+
+/*!
+ * DockOverlay paints a translucent rectangle over another widget. The geometry
+ * of the rectangle is based on the mouse location.
+ */
+class ADS_EXPORT CDockOverlay : public QFrame
+{
+	Q_OBJECT
+private:
+	DockOverlayPrivate* d; //< private data class
+	friend struct DockOverlayPrivate;
+	friend class DockOverlayCross;
+
+public:
+	using Super = QFrame;
+
+	enum eMode
+	{
+		ModeDockAreaOverlay,
+		ModeContainerOverlay
+	};
+
+	/**
+	 * Creates a dock overlay
+	 */
+	CDockOverlay(QWidget* parent, eMode Mode = ModeDockAreaOverlay);
+
+	/**
+	 * Virtual destructor
+	 */
+	virtual ~CDockOverlay();
+
+	/**
+	 * Configures the areas that are allowed for docking
+	 */
+	void setAllowedAreas(DockWidgetAreas areas);
+
+	/**
+	 * Enable / disable a certain area
+	 */
+	void setAllowedArea(DockWidgetArea area, bool Enable);
+
+	/**
+	 * Returns flags with all allowed drop areas
+	 */
+	DockWidgetAreas allowedAreas() const;
+
+	/**
+	 * Returns the drop area under the current cursor location
+	 */
+	DockWidgetArea dropAreaUnderCursor() const;
+
+	/**
+	 * If the drop area is the CenterDockWidgetArea or a sidebar area,
+	 * then this function returns the index of the tab under cursor.
+	 * Call this function after call to dropAreaUnderCursor() because this
+	 * function updates the tab index.
+	 * A value of -1 indicates a position before the first tab and a value of
+	 * tabCount() indicates a position behind the last tab.
+	 * A value of -2 indicates an valid value
+	 */
+	int tabIndexUnderCursor() const;
+
+	/**
+	 * This function returns the same like dropAreaUnderCursor() if this
+	 * overlay is not hidden and if drop preview is enabled and returns
+	 * InvalidDockWidgetArea if it is hidden or drop preview is disabled.
+	 */
+	DockWidgetArea visibleDropAreaUnderCursor() const;
+
+	/**
+	 * Show the drop overly for the given target widget
+	 */
+	DockWidgetArea showOverlay(QWidget* target);
+
+	/**
+	 * Hides the overlay
+	 */
+	void hideOverlay();
+
+	/**
+	 * Enables / disables the semi transparent overlay rectangle that represents
+	 * the future area of the dropped widget
+	 */
+	void enableDropPreview(bool Enable);
+
+	/**
+	 * Returns true if drop preview is enabled
+	 */
+	bool dropPreviewEnabled() const;
+
+	/**
+	 * The drop overlay rectangle for the target area
+	 */
+	QRect dropOverlayRect() const;
+
+	/**
+	 * Handle polish events
+	 */
+	virtual bool event(QEvent *e) override;
+
+protected:
+	virtual void paintEvent(QPaintEvent *e) override;
+	virtual void showEvent(QShowEvent* e) override;
+	virtual void hideEvent(QHideEvent* e) override;
+};
+
+
+struct DockOverlayCrossPrivate;
+/*!
+ * DockOverlayCross shows a cross with 5 different drop area possibilities.
+ * I could have handled everything inside DockOverlay, but because of some
+ * styling issues it's better to have a separate class for the cross.
+ * You can style the cross icon using the property system.
+ * \code
+ * ads--CDockOverlayCross
+  {
+		qproperty-iconFrameColor: palette(highlight);
+		qproperty-iconBackgroundColor: palette(base);
+		qproperty-iconOverlayColor: palette(highlight);
+		qproperty-iconArrowColor: rgb(227, 227, 227);
+		qproperty-iconShadowColor: rgb(0, 0, 0);
+	}
+ * \endcode
+ * Or you can use the iconColors property to pass in AARRGGBB values as
+ * hex string like shown in the example below.
+ * \code
+ * ads--CDockOverlayCross
+ * {
+ *     qproperty-iconColors: "Frame=#ff3d3d3d Background=#ff929292 Overlay=#1f3d3d3d Arrow=#ffb4b4b4 Shadow=#40474747";
+ * }
+ * \endcode
+ */
+class CDockOverlayCross : public QWidget
+{
+	Q_OBJECT
+	Q_PROPERTY(QString iconColors READ iconColors WRITE setIconColors)
+	Q_PROPERTY(QColor iconFrameColor READ iconColor WRITE setIconFrameColor)
+	Q_PROPERTY(QColor iconBackgroundColor READ iconColor WRITE setIconBackgroundColor)
+	Q_PROPERTY(QColor iconOverlayColor READ iconColor WRITE setIconOverlayColor)
+	Q_PROPERTY(QColor iconArrowColor READ iconColor WRITE setIconArrowColor)
+	Q_PROPERTY(QColor iconShadowColor READ iconColor WRITE setIconShadowColor)
+
+public:
+	enum eIconColor
+	{
+		FrameColor,///< the color of the frame of the small window icon
+		WindowBackgroundColor,///< the background color of the small window in the icon
+		OverlayColor,///< the color that shows the overlay (the dock side) in the icon
+		ArrowColor,///< the arrow that points into the direction
+		ShadowColor///< the color of the shadow rectangle that is painted below the icons
+	};
+
+private:
+	DockOverlayCrossPrivate* d;
+	friend struct DockOverlayCrossPrivate;
+	friend class CDockOverlay;
+
+protected:
+	/**
+     * This function returns an empty string and is only here to silence
+     * moc
+     */
+    QString iconColors() const;
+
+    /**
+     * This is a dummy function for the property system
+     */
+    QColor iconColor() const {return QColor();}
+    void setIconFrameColor(const QColor& Color) {setIconColor(FrameColor, Color);}
+    void setIconBackgroundColor(const QColor& Color) {setIconColor(WindowBackgroundColor, Color);}
+    void setIconOverlayColor(const QColor& Color) {setIconColor(OverlayColor, Color);}
+    void setIconArrowColor(const QColor& Color) {setIconColor(ArrowColor, Color);}
+    void setIconShadowColor(const QColor& Color) {setIconColor(ShadowColor, Color);}
+
+public:
+	/**
+	 * Creates an overlay cross for the given overlay
+	 */
+	CDockOverlayCross(CDockOverlay* overlay);
+
+	/**
+	 * Virtual destructor
+	 */
+	virtual ~CDockOverlayCross();
+
+	/**
+	 * Sets a certain icon color
+	 */
+	void setIconColor(eIconColor ColorIndex, const QColor& Color);
+
+	/**
+	 * Returns the icon color given by ColorIndex
+	 */
+	QColor iconColor(eIconColor ColorIndex) const;
+
+	/**
+	 * Returns the dock widget area depending on the current cursor location.
+	 * The function checks, if the mouse cursor is inside of any drop indicator
+	 * widget and returns the corresponding DockWidgetArea.
+	 */
+	DockWidgetArea cursorLocation() const;
+
+	/**
+	 * Sets up the overlay cross for the given overlay mode
+	 */
+	void setupOverlayCross(CDockOverlay::eMode Mode);
+
+	/**
+	 * Recreates the overlay icons.
+	 */
+	void updateOverlayIcons();
+
+	/**
+	 * Resets and updates the
+	 */
+	void reset();
+
+	/**
+	 * Updates the current position
+	 */
+	void updatePosition();
+
+	/**
+	 * A string with all icon colors to set.
+	 * You can use this property to style the overly icon via CSS stylesheet
+	 * file. The colors are set via a color identifier and a hex AARRGGBB value like
+	 * in the example below.
+	 * \code
+	 * ads--CDockOverlayCross
+	 * {
+	 *     qproperty-iconColors: "Frame=#ff3d3d3d Background=#ff929292 Overlay=#1f3d3d3d Arrow=#ffb4b4b4 Shadow=#40474747";
+	 * }
+	 */
+    void setIconColors(const QString& Colors);
+
+protected:
+	virtual void showEvent(QShowEvent* e) override;
+	void setAreaWidgets(const QHash<DockWidgetArea, QWidget*>& widgets);
+}; // CDockOverlayCross
+
+} // namespace ads
+#endif // DockOverlayH
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\DockSplitter.h
+==================================================
+#ifndef DockSplitterH
+#define DockSplitterH
+/*******************************************************************************
+** Qt Advanced Docking System
+** Copyright (C) 2017 Uwe Kindler
+**
+** This library is free software; you can redistribute it and/or
+** modify it under the terms of the GNU Lesser General Public
+** License as published by the Free Software Foundation; either
+** version 2.1 of the License, or (at your option) any later version.
+**
+** This library is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+** Lesser General Public License for more details.
+**
+** You should have received a copy of the GNU Lesser General Public
+** License along with this library; If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+
+//============================================================================
+/// \file   DockSplitter.h
+/// \author Uwe Kindler
+/// \date   24.03.2017
+/// \brief  Declaration of CDockSplitter
+//============================================================================
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include <QSplitter>
+
+#include "ads_globals.h"
+
+namespace ads
+{
+struct DockSplitterPrivate;
+
+/**
+ * Splitter used internally instead of QSplitter with some additional
+ * functionality.
+ */
+class ADS_EXPORT CDockSplitter : public QSplitter
+{
+	Q_OBJECT
+private:
+	DockSplitterPrivate* d;
+	friend struct DockSplitterPrivate;
+
+public:
+	CDockSplitter(QWidget *parent = Q_NULLPTR);
+	CDockSplitter(Qt::Orientation orientation, QWidget *parent = Q_NULLPTR);
+
+	/**
+	 * Prints debug info
+	 */
+	virtual ~CDockSplitter();
+
+	/**
+	 * Returns true, if any of the internal widgets is visible
+	 */
+	bool hasVisibleContent() const;
+
+	/**
+	 * Returns first widget or nullptr if splitter is empty
+	 */
+	QWidget* firstWidget() const;
+
+	/**
+	 * Returns last widget of nullptr is splitter is empty
+	 */
+	QWidget* lastWidget() const;
+
+    /**
+     * Returns true if the splitter contains central widget of dock manager.
+     */
+    bool isResizingWithContainer() const;
+}; // class CDockSplitter
+
+} // namespace ads
+
+//---------------------------------------------------------------------------
+#endif // DockSplitterH
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\DockWidget.h
+==================================================
+#ifndef DockWidgetH
+#define DockWidgetH
+/*******************************************************************************
+** Qt Advanced Docking System
+** Copyright (C) 2017 Uwe Kindler
+**
+** This library is free software; you can redistribute it and/or
+** modify it under the terms of the GNU Lesser General Public
+** License as published by the Free Software Foundation; either
+** version 2.1 of the License, or (at your option) any later version.
+**
+** This library is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+** Lesser General Public License for more details.
+**
+** You should have received a copy of the GNU Lesser General Public
+** License along with this library; If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+
+//============================================================================
+/// \file   DockWidget.h
+/// \author Uwe Kindler
+/// \date   26.02.2017
+/// \brief  Declaration of CDockWidget class
+//============================================================================
+
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include <QFrame>
+
+#include "ads_globals.h"
+
+QT_FORWARD_DECLARE_CLASS(QToolBar)
+QT_FORWARD_DECLARE_CLASS(QXmlStreamWriter)
+
+namespace ads
+{
+struct DockWidgetPrivate;
+class CDockWidgetTab;
+class CDockManager;
+class CDockContainerWidget;
+class CDockAreaWidget;
+class DockContainerWidgetPrivate;
+class CFloatingDockContainer;
+class CAutoHideTab;
+class CAutoHideDockContainer;
+class CAutoHideSideBar;
+
+/**
+ * The QDockWidget class provides a widget that can be docked inside a
+ * CDockManager or floated as a top-level window on the desktop.
+ */
+class ADS_EXPORT CDockWidget : public QFrame
+{
+    Q_OBJECT
+private:
+    DockWidgetPrivate* d; ///< private data (pimpl)
+    friend struct DockWidgetPrivate;
+
+private Q_SLOTS:
+    /**
+     * Adjusts the toolbar icon sizes according to the floating state
+     */
+    void setToolbarFloatingStyle(bool topLevel);
+
+protected:
+    friend class CDockContainerWidget;
+    friend class CDockAreaWidget;
+    friend class CFloatingDockContainer;
+    friend class CDockManager;
+    friend struct DockManagerPrivate;
+    friend class DockContainerWidgetPrivate;
+    friend class CDockAreaTabBar;
+    friend class CDockWidgetTab;
+    friend struct DockWidgetTabPrivate;
+    friend struct DockAreaTitleBarPrivate;
+    friend class CAutoHideDockContainer;
+    friend CAutoHideSideBar;
+
+    /**
+     * Assigns the dock manager that manages this dock widget
+     */
+    void setDockManager(CDockManager* DockManager);
+
+    /**
+     * If this dock widget is inserted into a dock area, the dock area will
+     * be registered on this widget via this function. If a dock widget is
+     * removed from a dock area, this function will be called with nullptr
+     * value.
+     */
+    void setDockArea(CDockAreaWidget* DockArea);
+
+    /**
+     * This function changes the toggle view action without emitting any
+     * signal
+     */
+    void setToggleViewActionChecked(bool Checked);
+
+    /**
+     * Saves the state into the given stream
+     */
+    void saveState(QXmlStreamWriter& Stream) const;
+
+    /**
+     * This is a helper function for the dock manager to flag this widget
+     * as unassigned.
+     * When calling the restore function, it may happen, that the saved state
+     * contains less dock widgets then currently available. All widgets whose
+     * data is not contained in the saved state, are flagged as unassigned
+     * after the restore process. If the user shows an unassigned dock widget,
+     * a floating widget will be created to take up the dock widget.
+     */
+    void flagAsUnassigned();
+
+    /**
+     * Call this function to emit a topLevelChanged() signal and to update
+     * the dock area tool bar visibility
+     */
+    static void emitTopLevelEventForWidget(CDockWidget* TopLevelDockWidget, bool Floating);
+
+    /**
+     * Use this function to emit a top level changed event.
+     * Do never use emit topLevelChanged(). Always use this function because
+     * it only emits a signal if the floating state has really changed
+     */
+    void emitTopLevelChanged(bool Floating);
+
+    /**
+     * Internal function for modifying the closed state when restoring
+     * a saved docking state
+     */
+    void setClosedState(bool Closed);
+
+    /**
+     * Internal toggle view function that does not check if the widget
+     * already is in the given state
+     */
+    void toggleViewInternal(bool Open);
+
+    /**
+     * Internal close dock widget implementation.
+     * The function returns true if the dock widget has been closed or hidden
+     */
+    bool closeDockWidgetInternal(bool ForceClose = false);
+
+public:
+    using Super = QFrame;
+
+    enum DockWidgetFeature
+    {
+        DockWidgetClosable = 0x001,///< dock widget has a close button
+        DockWidgetMovable = 0x002,///< dock widget is movable and can be moved to a new position in the current dock container
+        DockWidgetFloatable = 0x004,///< dock widget can be dragged into a floating window
+        DockWidgetDeleteOnClose = 0x008, ///< deletes the dock widget when it is closed
+        CustomCloseHandling = 0x010, ///< clicking the close button will not close the dock widget but emits the closeRequested() signal instead
+        DockWidgetFocusable = 0x020, ///< if this is enabled, a dock widget can get focus highlighting
+        DockWidgetForceCloseWithArea = 0x040, ///< dock widget will be closed when the dock area hosting it is closed
+        NoTab = 0x080, ///< dock widget tab will never be shown if this flag is set
+        DeleteContentOnClose = 0x100, ///< deletes only the contained widget on close, keeping the dock widget intact and in place. Attempts to rebuild the contents widget on show if there is a widget factory set.
+        DockWidgetPinnable = 0x200, ///< dock widget can be pinned and added to an auto hide dock container
+        DefaultDockWidgetFeatures = DockWidgetClosable | DockWidgetMovable | DockWidgetFloatable | DockWidgetFocusable | DockWidgetPinnable,
+        AllDockWidgetFeatures = DefaultDockWidgetFeatures | DockWidgetDeleteOnClose | CustomCloseHandling,
+        DockWidgetAlwaysCloseAndDelete = DockWidgetForceCloseWithArea | DockWidgetDeleteOnClose,
+        GloballyLockableFeatures = DockWidgetClosable | DockWidgetMovable | DockWidgetFloatable | DockWidgetPinnable,
+        NoDockWidgetFeatures = 0x000
+    };
+    Q_DECLARE_FLAGS(DockWidgetFeatures, DockWidgetFeature)
+
+    enum eState
+    {
+        StateHidden,
+        StateDocked,
+        StateFloating
+    };
+
+    enum eToolBarStyleSource
+    {
+    	ToolBarStyleFromDockManager,
+    	ToolBarStyleFromDockWidget
+    };
+
+    /**
+     * Sets the widget for the dock widget to widget.
+     * The InsertMode defines how the widget is inserted into the dock widget.
+     * The content of a dock widget should be resizable do a very small size to
+     * prevent the dock widget from blocking the resizing. To ensure, that a
+     * dock widget can be resized very well, it is better to insert the content+
+     * widget into a scroll area or to provide a widget that is already a scroll
+     * area or that contains a scroll area.
+     * If the InsertMode is AutoScrollArea, the DockWidget tries to automatically
+     * detect how to insert the given widget. If the widget is derived from
+     * QScrollArea (i.e. an QAbstractItemView), then the widget is inserted
+     * directly. If the given widget is not a scroll area, the widget will be
+     * inserted into a scroll area.
+     * To force insertion into a scroll area, you can also provide the InsertMode
+     * ForceScrollArea. To prevent insertion into a scroll area, you can
+     * provide the InsertMode ForceNoScrollArea
+     */
+    enum eInsertMode
+    {
+        AutoScrollArea,
+        ForceScrollArea,
+        ForceNoScrollArea
+    };
+
+
+    /**
+     * The mode of the minimumSizeHint() that is returned by the DockWidget
+     * minimumSizeHint() function.
+     * To ensure, that a dock widget does not block resizing, the dock widget
+     * reimplements minimumSizeHint() function to return a very small minimum
+     * size hint. If you would like to adhere the minimumSizeHint() from the
+     * content widget, then set the minimumSizeHintMode() to
+     * MinimumSizeHintFromContent. If you would like to use the minimumSize()
+     * value of the content widget or the dock widget, then you can use the
+     * MinimumSizeHintFromDockWidgetMinimumSize or
+     * MinimumSizeHintFromContentMinimumSize modes.
+     */
+    enum eMinimumSizeHintMode
+    {
+    	MinimumSizeHintFromDockWidget,
+    	MinimumSizeHintFromContent,
+    	MinimumSizeHintFromDockWidgetMinimumSize,
+    	MinimumSizeHintFromContentMinimumSize,
+    };
+
+
+    /**
+     * This mode configures the behavior of the toggle view action.
+     * If the mode if ActionModeToggle, then the toggle view action is
+     * a checkable action to show / hide the dock widget. If the mode
+     * is ActionModeShow, then the action is not checkable an it will
+     * always show the dock widget if clicked. If the mode is ActionModeShow,
+     * the user can only close the DockWidget with the close button.
+     */
+    enum eToggleViewActionMode
+    {
+        ActionModeToggle,//!< ActionModeToggle
+        ActionModeShow   //!< ActionModeShow
+    };
+
+
+    /**
+     * This constructor creates a dock widget with the given title.
+     * The title is the text that is shown in the window title when the dock
+     * widget is floating and it is the title that is shown in the titlebar
+     * or the tab of this dock widget if it is tabified.
+     * The object name of the dock widget is also set to the title. The
+     * object name is required by the dock manager to properly save and restore
+     * the state of the dock widget. That means, the title needs to be unique.
+     * If your title is not unique or if you would like to change the title
+     * during runtime, you need to set a unique object name explicitly
+     * by calling setObjectName() after construction.
+     * Use the layoutFlags to configure the layout of the dock widget.
+     * \note If you would like to use custom TabWidget implementations, you need
+     * to use the constructor with the CDockManager argument.
+     */
+    Q_DECL_DEPRECATED explicit CDockWidget(const QString &title, QWidget* parent = nullptr);
+
+    /**
+     * This constructor creates a dock widget for the given dock manager with the
+     * provided title.
+     *
+     * @param manager Pointer to the dock manager that owns the dock widget.
+     * @param title The title is the text that is shown in the window title when
+     * the dock widget is floating and it is the title that is shown in the
+     * titlebar or the tab of this dock widget if it is tabified.
+     * @param parent Pointer to the parent widget, defaults to nullptr.
+     *
+     * @note The object name of the dock widget is also set to the title. The
+     * object name is required by the dock manager to properly save and restore
+     * the state of the dock widget. That means, the title needs to be unique. If
+     * the title is not unique or if you would like to change the title during
+     * runtime, you need to set a unique object name explicitly by calling
+     * setObjectName() after construction. Use the layoutFlags to configure the
+     * layout of the dock widget.
+     *
+     * @note this constructor is preferred over the two argument version, especially
+     * when custom factories are in use. Indeed, it will use the Dock Manager factory,
+     * and not the default factory. For this reason, the original constructor should
+     * be deprecated in favour of this version.
+     */
+    CDockWidget(CDockManager *manager, const QString &title, QWidget* parent = nullptr);
+
+    /**
+     * Virtual Destructor
+     */
+    ~CDockWidget() override;
+
+    /**
+     * We return a fixed minimum size hint or the size hint of the content
+     * widget if minimum size hint mode is MinimumSizeHintFromContent
+     */
+    virtual QSize minimumSizeHint() const override;
+
+    /**
+     * Sets the widget for the dock widget to widget.
+     * The InsertMode defines how the widget is inserted into the dock widget.
+     * The content of a dock widget should be resizable to a very small size to
+     * prevent the dock widget from blocking the resizing. To ensure, that a
+     * dock widget can be resized very well, it is better to insert the content+
+     * widget into a scroll area or to provide a widget that is already a scroll
+     * area or that contains a scroll area.
+     * If the InsertMode is AutoScrollArea, the DockWidget tries to automatically
+     * detect how to insert the given widget. If the widget is derived from
+     * QScrollArea (i.e. an QAbstractItemView), then the widget is inserted
+     * directly. If the given widget is not a scroll area, the widget will be
+     * inserted into a scroll area.
+     * To force insertion into a scroll area, you can also provide the InsertMode
+     * ForceScrollArea. To prevent insertion into a scroll area, you can
+     * provide the InsertMode ForceNoScrollArea
+     */
+    void setWidget(QWidget* widget, eInsertMode InsertMode = AutoScrollArea);
+	
+	/**
+	 * Only used when the feature flag DeleteContentOnClose is set.
+	 * Using the flag and setting a widget factory allows to free the resources
+	 * of the widget of your application while retaining the position the next
+	 * time you want to show your widget, unlike the flag DockWidgetDeleteOnClose
+	 * which deletes the dock widget itself. Since we keep the dock widget, all
+	 * regular features of ADS should work as normal, including saving and
+	 * restoring the state of the docking system and using perspectives.
+	 */
+	using FactoryFunc = std::function<QWidget*(QWidget*)>;
+	void setWidgetFactory(FactoryFunc createWidget, eInsertMode InsertMode = AutoScrollArea);
+	
+    /**
+     * Remove the widget from the dock and give ownership back to the caller
+     */
+    QWidget* takeWidget();
+
+    /**
+     * Returns the widget for the dock widget. This function returns zero if
+     * the widget has not been set.
+     */
+    QWidget* widget() const;
+
+    /**
+     * Returns the tab widget of this dock widget that is shown in the dock
+     * area title bar
+     */
+    CDockWidgetTab* tabWidget() const;
+
+    /**
+     * Sets, whether the dock widget is movable, closable, and floatable.
+     */
+    void setFeatures(DockWidgetFeatures features);
+
+    /**
+     * Sets the feature flag for this dock widget if on is true; otherwise
+     * clears the flag.
+     */
+    void setFeature(DockWidgetFeature flag, bool on);
+
+    /**
+     * This property holds whether the dock widget is movable, closable, and
+     * floatable.
+     * By default, this property is set to a combination of DockWidgetClosable,
+     * DockWidgetMovable and DockWidgetFloatable.
+     */
+    DockWidgetFeatures features() const;
+
+    /**
+     * Triggers notification of feature change signals and functions
+     */
+    void notifyFeaturesChanged();
+
+    /**
+     * Returns the dock manager that manages the dock widget or 0 if the widget
+     * has not been assigned to any dock manager yet
+     */
+    CDockManager* dockManager() const;
+
+    /**
+     * Returns the dock container widget this dock area widget belongs to or 0
+     * if this dock widget has not been docked yet
+     */
+    CDockContainerWidget* dockContainer() const;
+
+    /**
+     * This function return the floating DockContainer if is isFloating() is true
+     * and a nullptr if this dock widget is not floating.
+     */
+    CFloatingDockContainer* floatingDockContainer() const;
+
+    /**
+     * Returns the dock area widget this dock widget belongs to or 0
+     * if this dock widget has not been docked yet
+     */
+    CDockAreaWidget* dockAreaWidget() const;
+
+    /**
+     * Returns the side tab widget for this dock, if this dock widget is in
+     * a auto hide container. If it is not in a auto hide container, then this
+     * function returns a nullptr,
+     */
+    CAutoHideTab* sideTabWidget() const;
+
+    /**
+     * Assign a side tab widget if this dock widget is an auto hide container
+     */
+    void setSideTabWidget(CAutoHideTab* SideTab) const;
+
+    /**
+     * Returns true, if this dock widget is in an auto hide container
+     */
+    bool isAutoHide() const;
+
+    /**
+     * Returns the auto hide dock container of this dock widget
+     * or 0 if there is none
+     */
+    CAutoHideDockContainer* autoHideDockContainer() const;
+
+    /**
+     * Returns the auto hide side bar location or SideBarNone if, this is not
+     * an autohide dock widget
+     */
+    SideBarLocation autoHideLocation() const;
+
+    /**
+     * This property holds whether the dock widget is floating.
+     * A dock widget is only floating, if it is the one and only widget inside
+     * of a floating container. If there are more than one dock widget in a
+     * floating container, the all dock widgets are docked and not floating.
+     */
+    bool isFloating() const;
+
+    /**
+     * This function returns true, if this dock widget is in a floating.
+     * The function returns true, if the dock widget is floating and it also
+     * returns true if it is docked inside of a floating container.
+     */
+    bool isInFloatingContainer() const;
+
+    /**
+     * Returns true, if this dock widget is closed.
+     */
+    bool isClosed() const;
+
+    /**
+     * Returns a checkable action that can be used to show or close this dock widget.
+     * The action's text is set to the dock widget's window title.
+     */
+    QAction* toggleViewAction() const;
+
+    /**
+     * Use provided action to be the default toggle view action for this dock widget.
+     * This dock widget now owns the action.
+     */
+    void setToggleViewAction(QAction* action);
+
+    /**
+     * Configures the behavior of the toggle view action.
+     * \see eToggleViewActionMode for a detailed description
+     */
+    void setToggleViewActionMode(eToggleViewActionMode Mode);
+
+    /**
+     * Configures the minimum size hint that is returned by the
+     * minimumSizeHint() function.
+     * \see eMinimumSizeHintMode for a detailed description
+     */
+    void setMinimumSizeHintMode(eMinimumSizeHintMode Mode);
+
+    /**
+     * Get the minimum size hint mode configured by setMinimumSizeHintMode
+     */
+    eMinimumSizeHintMode minimumSizeHintMode() const;
+
+    /**
+     * Returns true if the dock widget is set as central widget of it's dock manager
+     */
+    bool isCentralWidget() const;
+
+    /**
+     * Sets the dock widget icon that is shown in tabs and in toggle view
+     * actions
+     */
+    void setIcon(const QIcon& Icon);
+
+    /**
+     * Returns the icon that has been assigned to the dock widget
+     */
+    QIcon icon() const;
+
+    /**
+     * This function returns the dock widget top tool bar.
+     * If no toolbar is assigned, this function returns nullptr. To get a valid
+     * toolbar you either need to create a default empty toolbar via
+     * createDefaultToolBar() function or you need to assign your custom
+     * toolbar via setToolBar().
+     */
+    QToolBar* toolBar() const;
+
+    /**
+     * If you would like to use the default top tool bar, then call this
+     * function to create the default tool bar.
+     * After this function the toolBar() function will return a valid toolBar()
+     * object.
+     */
+    QToolBar* createDefaultToolBar();
+
+    /**
+     * Assign a new tool bar that is shown above the content widget.
+     * The dock widget will become the owner of the tool bar and deletes it
+     * on destruction
+     */
+    void setToolBar(QToolBar* ToolBar);
+
+    /**
+     * Configures, if the dock widget uses the global tool bar styles from
+     * dock manager or if it uses its own tool bar style
+     */
+    void setToolBarStyleSource(eToolBarStyleSource Source);
+
+    /**
+     * Returns the configured tool bar style source
+     */
+    eToolBarStyleSource toolBarStyleSource() const;
+
+    /**
+     * This function sets the tool button style for the given dock widget state.
+     * It is possible to switch the tool button style depending on the state.
+     * If a dock widget is floating, then here are more space and it is
+     * possible to select a style that requires more space like
+     * Qt::ToolButtonTextUnderIcon. For the docked state Qt::ToolButtonIconOnly
+     * might be better.
+     */
+    void setToolBarStyle(Qt::ToolButtonStyle Style, eState State);
+
+    /**
+     * Returns the tool button style for the given docking state.
+     * \see setToolBarStyle()
+     */
+    Qt::ToolButtonStyle toolBarStyle(eState State) const;
+
+    /**
+     * This function sets the tool button icon size for the given state.
+     * If a dock widget is floating, there is more space an increasing the
+     * icon size is possible. For docked widgets, small icon sizes, eg. 16 x 16
+     * might be better.
+     */
+    void setToolBarIconSize(const QSize& IconSize, eState State);
+
+    /**
+     * Returns the icon size for a given docking state.
+     * \see setToolBarIconSize()
+     */
+    QSize toolBarIconSize(eState State) const;
+
+    /**
+     * Set the actions that will be shown in the dock area title bar
+     * if this dock widget is the active tab.
+     * You should not add to many actions to the title bar, because this
+     * will remove the available space for the tabs. If you have a number
+     * of actions, just add an action with a menu to show a popup menu
+     * button in the title bar.
+     */
+    void setTitleBarActions(QList<QAction*> actions);
+
+    /**
+     * Returns a list of actions that will be inserted into the dock area title
+     * bar if this dock widget becomes the current widget
+     */
+    virtual QList<QAction*> titleBarActions() const;
+
+
+#ifndef QT_NO_TOOLTIP
+    /**
+     * This is function sets text tooltip for title bar widget
+     * and tooltip for toggle view action
+     */
+    void setTabToolTip(const QString &text);
+#endif
+
+    /**
+     * Returns true if the dock widget is floating and if the floating dock
+     * container is full screen
+     */
+    bool isFullScreen() const;
+
+    /**
+     * Returns true if this dock widget is in a dock area, that contains at
+     * least 2 opened dock widgets
+     */
+    bool isTabbed() const;
+
+    /**
+     * Returns true if this dock widget is the current one in the dock
+     * area widget that contains it.
+     * If the dock widget is the only opened dock widget in a dock area,
+     * the true is returned
+     */
+    bool isCurrentTab() const;
+
+public: // reimplements QFrame -----------------------------------------------
+    /**
+     * Emits titleChanged signal if title change event occurs
+     */
+    virtual bool event(QEvent *e) override;
+
+public Q_SLOTS:
+    /**
+     * This property controls whether the dock widget is open or closed.
+     * The toogleViewAction triggers this slot
+     */
+    void toggleView(bool Open = true);
+
+    /**
+     * Makes this dock widget the current tab in its dock area.
+     * The function only has an effect, if the dock widget is open. A call
+     * to this function will not toggle the view, so if it is closed,
+     * nothing will happen
+     */
+    void setAsCurrentTab();
+
+    /**
+     * Brings the dock widget to the front
+     * This means:
+     * 	- If the dock widget is tabbed with other dock widgets but its tab is not current, it's made current.
+     * 	- If the dock widget is floating, QWindow::raise() is called.
+     * 	This only applies if the dock widget is already open. If closed, does nothing.
+     */
+    void raise();
+
+    /**
+     * This function will make a docked widget floating
+     */
+    void setFloating();
+
+    /**
+     * This function will delete the dock widget and its content from the
+     * docking system
+     */
+    void deleteDockWidget();
+
+    /**
+     * Closes the dock widget.
+     * The function forces closing of the dock widget even for CustomCloseHandling.
+     */
+    void closeDockWidget();
+
+    /**
+     * Request closing of the dock widget.
+     * For DockWidget with default close handling, the function does the same
+     * like clodeDockWidget() but if the flas CustomCloseHandling is set,
+     * the function only emits the closeRequested() signal.
+     */
+    void requestCloseDockWidget();
+
+    /**
+     * Shows the widget in full-screen mode.
+     * Normally this function only affects windows. To make the interface
+     * compatible to QDockWidget, this function also maximizes a floating
+     * dock widget.
+     *
+     * \note Full-screen mode works fine under Windows, but has certain
+     * problems (doe not work) under X (Linux). These problems are due to
+     * limitations of the ICCCM protocol that specifies the communication
+     * between X11 clients and the window manager. ICCCM simply does not
+     * understand the concept of non-decorated full-screen windows.
+     */
+    void showFullScreen();
+
+    /**
+     * This function complements showFullScreen() to restore the widget
+     * after it has been in full screen mode.
+     */
+    void showNormal();
+
+	/**
+	 * Sets the dock widget into auto hide mode if this feature is enabled
+	 * via CDockManager::setAutoHideFlags(CDockManager::AutoHideFeatureEnabled)
+	 */
+	void setAutoHide(bool Enable, SideBarLocation Location = SideBarNone, int TabIndex = -1);
+
+	/**
+	 * Switches the dock widget to auto hide mode or vice versa depending on its
+	 * current state.
+	 */
+	void toggleAutoHide(SideBarLocation Location = SideBarNone);
+
+
+Q_SIGNALS:
+    /**
+     * This signal is emitted if the dock widget is opened or closed
+     */
+    void viewToggled(bool Open);
+
+    /**
+     * This signal is emitted if the dock widget is closed
+     */
+    void closed();
+
+    /**
+     * This signal is emitted if the window title of this dock widget
+     * changed
+     */
+    void titleChanged(const QString& Title);
+
+    /**
+     * This signal is emitted when the floating property changes.
+     * The topLevel parameter is true if the dock widget is now floating;
+     * otherwise it is false.
+     */
+    void topLevelChanged(bool topLevel);
+
+    /**
+     * This signal is emitted, if close is requested
+     */
+    void closeRequested();
+
+    /**
+     * This signal is emitted when the dock widget becomes visible (or invisible).
+     * This happens when the widget is hidden or shown, as well as when it is
+     * docked in a tabbed dock area and its tab becomes selected or unselected.
+     */
+    void visibilityChanged(bool visible);
+
+    /**
+     * This signal is emitted when the features property changes.
+     * The features parameter gives the new value of the property.
+     */
+    void featuresChanged(ads::CDockWidget::DockWidgetFeatures features);
+}; // class DockWidget
+} // namespace ads
+
+Q_DECLARE_OPERATORS_FOR_FLAGS(ads::CDockWidget::DockWidgetFeatures)
+//-----------------------------------------------------------------------------
+#endif // DockWidgetH
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\DockWidgetTab.h
+==================================================
+#ifndef DockWidgetTabH
+#define DockWidgetTabH
+/*******************************************************************************
+** Qt Advanced Docking System
+** Copyright (C) 2017 Uwe Kindler
+**
+** This library is free software; you can redistribute it and/or
+** modify it under the terms of the GNU Lesser General Public
+** License as published by the Free Software Foundation; either
+** version 2.1 of the License, or (at your option) any later version.
+**
+** This library is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+** Lesser General Public License for more details.
+**
+** You should have received a copy of the GNU Lesser General Public
+** License along with this library; If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+
+//============================================================================
+/// \file   DockWidgetTab.h
+/// \author Uwe Kindler
+/// \date   27.02.2017
+/// \brief  Declaration of CDockWidgetTab class
+//============================================================================
+
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include <QFrame>
+#include <QSize>
+
+#include "ads_globals.h"
+
+QT_FORWARD_DECLARE_CLASS(QMenu)
+
+namespace ads
+{
+class CDockWidget;
+class CDockAreaWidget;
+struct DockWidgetTabPrivate;
+class CDockManager;
+
+/**
+ * A dock widget tab that shows a title and an icon.
+ * The dock widget tab is shown in the dock area title bar to switch between
+ * tabbed dock widgets
+ */
+class ADS_EXPORT CDockWidgetTab : public QFrame
+{
+	Q_OBJECT
+	Q_PROPERTY(bool activeTab READ isActiveTab WRITE setActiveTab NOTIFY activeTabChanged)
+	Q_PROPERTY(QSize iconSize READ iconSize WRITE setIconSize)
+
+private:
+	DockWidgetTabPrivate* d; ///< private data (pimpl)
+	friend struct DockWidgetTabPrivate;
+	friend class CDockWidget;
+	friend class CDockManager;
+	friend class CAutoHideDockContainer;
+	void onDockWidgetFeaturesChanged();
+
+private Q_SLOTS:
+	void detachDockWidget();
+	void autoHideDockWidget();
+	void onAutoHideToActionClicked();
+
+protected:
+	virtual void mousePressEvent(QMouseEvent* ev) override;
+	virtual void mouseReleaseEvent(QMouseEvent* ev) override;
+	virtual void mouseMoveEvent(QMouseEvent* ev) override;
+	virtual void contextMenuEvent(QContextMenuEvent* ev) override;
+
+	/**
+	 * Double clicking the tab widget makes the assigned dock widget floating
+	 */
+	virtual void mouseDoubleClickEvent(QMouseEvent *event) override;
+
+public:
+	using Super = QFrame;
+	/**
+	 * Default Constructor
+	 * param[in] DockWidget The dock widget this title bar belongs to
+	 * param[in] parent The parent widget of this title bar
+	 */
+	CDockWidgetTab(CDockWidget* DockWidget, QWidget* parent = nullptr);
+
+	/**
+	 * Virtual Destructor
+	 */
+	virtual ~CDockWidgetTab();
+
+	/**
+	 * Returns true, if this is the active tab
+	 */
+	bool isActiveTab() const;
+
+	/**
+	 * Set this true to make this tab the active tab
+	 */
+	void setActiveTab(bool active);
+
+	/**
+	 * Sets the dock area widget the dockWidget returned by dockWidget()
+	 * function belongs to.
+	 */
+	void setDockAreaWidget(CDockAreaWidget* DockArea);
+
+	/**
+	 * Returns the dock area widget this title bar belongs to.
+	 * \return This function returns 0 if the dock widget that owns this title
+	 * bar widget has not been added to any dock area yet.
+	 */
+	CDockAreaWidget* dockAreaWidget() const;
+
+	/**
+	 * Returns the dock widget this title widget belongs to
+	 */
+	CDockWidget* dockWidget() const;
+
+	/**
+	 * Sets the icon to show in title bar
+	 */
+	void setIcon(const QIcon& Icon);
+
+	/**
+	 * Returns the icon
+	 */
+	const QIcon& icon() const;
+
+	/**
+	 * Returns the tab text
+	 */
+	QString text() const;
+
+	/**
+	 * Sets the tab text
+	 */
+	void setText(const QString& title);
+
+	/**
+	 * Returns true if text is elided on the tab's title
+	 */
+	bool isTitleElided() const;
+
+	/**
+	 * This function returns true if the assigned dock widget is closable
+	 */
+	bool isClosable() const;
+
+	/**
+	* Track event ToolTipChange and set child ToolTip 
+	*/
+	virtual bool event(QEvent *e) override;
+
+	/**
+	 * Sets the text elide mode
+	 */
+	void setElideMode(Qt::TextElideMode mode);
+
+	/**
+	 * Update stylesheet style if a property changes
+	 */
+	void updateStyle();
+
+	/**
+	 * Returns the icon size.
+	 * If no explicit icon size has been set, the function returns an invalid
+	 * QSize
+	 */
+	QSize iconSize() const;
+
+	/**
+	 * Set an explicit icon size.
+	 * If no icon size has been set explicitly, than the tab sets the icon size
+	 * depending on the style
+	 */
+	void setIconSize(const QSize& Size);
+
+	/**
+	 * Returns the current drag state of this tab.
+	 * Use this function to determine if the tab is currently being dragged
+	 */
+	eDragState dragState() const;
+
+    /**
+     * Fills the provided menu with standard entries. If a nullptr is passed, a
+     * new menu is created and filled with standard entries.
+     * This function is called from the actual version of contextMenuEvent, but
+     * can be called from any code. Caller is responsible of deleting the created
+     * object.
+     *
+     * @param menu The QMenu to fill with standard entries. If nullptr, a new
+     * QMenu will be created.
+     * @return The filled QMenu, either the provided one or a newly created one if
+     * nullptr was passed.
+     */
+    virtual QMenu *buildContextMenu(QMenu *);
+
+public Q_SLOTS:
+	virtual void setVisible(bool visible) override;
+
+Q_SIGNALS:
+	void activeTabChanged();
+	void clicked();
+	void closeRequested();
+	void closeOtherTabsRequested();
+	void moved(const QPoint& GlobalPos);
+	void elidedChanged(bool elided);
+}; // class DockWidgetTab
+}
+ // namespace ads
+//-----------------------------------------------------------------------------
+#endif // DockWidgetTabH
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\ElidingLabel.h
+==================================================
+#ifndef ElidingLabelH
+#define ElidingLabelH
+/*******************************************************************************
+** Qt Advanced Docking System
+** Copyright (C) 2017 Uwe Kindler
+**
+** This library is free software; you can redistribute it and/or
+** modify it under the terms of the GNU Lesser General Public
+** License as published by the Free Software Foundation; either
+** version 2.1 of the License, or (at your option) any later version.
+**
+** This library is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+** Lesser General Public License for more details.
+**
+** You should have received a copy of the GNU Lesser General Public
+** License along with this library; If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+
+//============================================================================
+/// \file   ElidingLabel.h
+/// \author Uwe Kindler
+/// \date   05.11.2018
+/// \brief  Declaration of CElidingLabel
+//============================================================================
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include <QLabel>
+
+#include "ads_globals.h"
+
+namespace ads
+{
+struct ElidingLabelPrivate;
+
+/**
+ * A QLabel that supports eliding text.
+ * Because the functions setText() and text() are no virtual functions setting
+ * and reading the text via a pointer to the base class QLabel does not work
+ * properly
+ */
+class ADS_EXPORT CElidingLabel : public QLabel
+{
+	Q_OBJECT
+private:
+	ElidingLabelPrivate* d;
+	friend struct ElidingLabelPrivate;
+
+protected:
+	virtual void mouseReleaseEvent(QMouseEvent* event) override;
+    virtual void resizeEvent( QResizeEvent *event ) override;
+    virtual void mouseDoubleClickEvent( QMouseEvent *ev ) override;
+
+public:
+    using Super = QLabel;
+
+    CElidingLabel(QWidget* parent = nullptr, Qt::WindowFlags f = Qt::WindowFlags ());
+    CElidingLabel(const QString& text, QWidget* parent = nullptr, Qt::WindowFlags f = Qt::WindowFlags ());
+	virtual ~CElidingLabel();
+
+	/**
+	 * Returns the text elide mode.
+	 * The default mode is ElideNone
+	 */
+	Qt::TextElideMode elideMode() const;
+
+	/**
+	 * Sets the text elide mode
+	 */
+	void setElideMode(Qt::TextElideMode mode);
+
+	/**
+	 * This function indicates whether the text on this label is currently elided
+	 */
+	bool isElided() const;
+
+public: // reimplements QLabel ----------------------------------------------
+	virtual QSize minimumSizeHint() const override;
+	virtual QSize sizeHint() const override;
+	void setText(const QString &text);
+	QString text() const;
+
+Q_SIGNALS:
+	/**
+	 * This signal is emitted if the user clicks on the label (i.e. pressed
+	 * down then released while the mouse cursor is inside the label)
+	 */
+	void clicked();
+
+	/**
+	 * This signal is emitted if the user does a double click on the label
+	 */
+	void doubleClicked();
+    
+    /**
+	 * This signal is emitted when isElided() state of this label is changed
+	 */
+	void elidedChanged(bool elided);
+}; //class CElidingLabel
+
+} // namespace QtLabb
+
+//---------------------------------------------------------------------------
+#endif // ElidingLabelH
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\FloatingDockContainer.h
+==================================================
+#ifndef FloatingDockContainerH
+#define FloatingDockContainerH
+/*******************************************************************************
+** Qt Advanced Docking System
+** Copyright (C) 2017 Uwe Kindler
+**
+** This library is free software; you can redistribute it and/or
+** modify it under the terms of the GNU Lesser General Public
+** License as published by the Free Software Foundation; either
+** version 2.1 of the License, or (at your option) any later version.
+**
+** This library is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+** Lesser General Public License for more details.
+**
+** You should have received a copy of the GNU Lesser General Public
+** License along with this library; If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+
+//============================================================================
+/// \file   FloatingDockContainer.h
+/// \author Uwe Kindler
+/// \date   01.03.2017
+/// \brief  Declaration of CFloatingDockContainer class
+//============================================================================
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include "ads_globals.h"
+
+#include <QRubberBand>
+
+#if defined(Q_OS_UNIX) && !defined(Q_OS_MACOS)
+#include <QDockWidget>
+#define tFloatingWidgetBase QDockWidget
+#else
+#include <QWidget>
+#define tFloatingWidgetBase QWidget
+#endif
+
+class CDockingStateReader;
+
+namespace ads
+{
+struct FloatingDockContainerPrivate;
+class CDockManager;
+struct DockManagerPrivate;
+class CDockAreaWidget;
+class CDockContainerWidget;
+class CDockWidget;
+class CDockManager;
+class CDockAreaTabBar;
+class CDockWidgetTab;
+struct DockWidgetTabPrivate;
+class CDockAreaTitleBar;
+struct DockAreaTitleBarPrivate;
+class CFloatingWidgetTitleBar;
+class CDockingStateReader;
+
+/**
+ * Pure virtual interface for floating widgets.
+ * This interface is used for opaque and non-opaque undocking. If opaque
+ * undocking is used, the a real CFloatingDockContainer widget will be created
+ */
+class ADS_EXPORT IFloatingWidget
+{
+public:
+    virtual ~IFloatingWidget() = default;
+
+	/**
+	 * Starts floating.
+	 * This function should get called typically from a mouse press event
+	 * handler
+	 */
+	virtual void startFloating(const QPoint& DragStartMousePos, const QSize& Size,
+        eDragState DragState, QWidget* MouseEventHandler) = 0;
+
+	/**
+	 * Moves the widget to a new position relative to the position given when
+	 * startFloating() was called.
+	 * This function should be called from a mouse mouve event handler to
+	 * move the floating widget on mouse move events.
+	 */
+	virtual void moveFloating() = 0;
+
+	/**
+	 * Tells the widget that to finish dragging if the mouse is released.
+	 * This function should be called from a mouse release event handler
+	 * to finish the dragging
+	 */
+	virtual void finishDragging() = 0;
+};
+
+
+/**
+ * This implements a floating widget that is a dock container that accepts
+ * docking of dock widgets like the main window and that can be docked into
+ * another dock container.
+ * Every floating window of the docking system is a FloatingDockContainer.
+ */
+class ADS_EXPORT CFloatingDockContainer : public tFloatingWidgetBase, public IFloatingWidget
+{
+	Q_OBJECT
+private:
+	FloatingDockContainerPrivate* d; ///< private data (pimpl)
+	friend struct FloatingDockContainerPrivate;
+	friend class CDockManager;
+	friend struct DockManagerPrivate;
+	friend class CDockAreaTabBar;
+	friend struct DockWidgetTabPrivate;
+	friend class CDockWidgetTab;
+	friend class CDockAreaTitleBar;
+	friend struct DockAreaTitleBarPrivate;
+	friend class CDockWidget;
+	friend class CDockAreaWidget;
+    friend class CFloatingWidgetTitleBar;
+
+private Q_SLOTS:
+	void onDockAreasAddedOrRemoved();
+	void onDockAreaCurrentChanged(int Index);
+
+protected:
+	/**
+	 * Starts floating at the given global position.
+	 * Use moveToGlobalPos() to move the widget to a new position
+	 * depending on the start position given in Pos parameter
+	 */
+	virtual void startFloating(const QPoint& DragStartMousePos, const QSize& Size,
+        eDragState DragState, QWidget* MouseEventHandler) override;
+
+	/**
+	 * Call this function if you explicitly want to signal that dragging has
+	 * finished
+	 */
+	virtual void finishDragging() override;
+
+	/**
+	 * This function deletes all dock widgets in it.
+	 * This functions should be called only from dock manager in its
+	 * destructor before deleting the floating widget
+     */
+	void deleteContent();
+
+	/**
+	 * Call this function if you just want to initialize the position
+	 * and size of the floating widget
+	 */
+	void initFloatingGeometry(const QPoint& DragStartMousePos, const QSize& Size)
+	{
+        startFloating(DragStartMousePos, Size, DraggingInactive, nullptr);
+	}
+
+	/**
+	 * Moves the widget to a new position relative to the position given when
+	 * startFloating() was called
+	 */
+	void moveFloating() override;
+
+	/**
+	 * Restores the state from given stream.
+	 * If Testing is true, the function only parses the data from the given
+	 * stream but does not restore anything. You can use this check for
+	 * faulty files before you start restoring the state
+	 */
+	bool restoreState(CDockingStateReader& Stream, bool Testing);
+
+	/**
+	 * Call this function to update the window title
+	 */
+    void updateWindowTitle();
+
+protected: // reimplements QWidget
+	virtual void changeEvent(QEvent *event) override;
+	virtual void closeEvent(QCloseEvent *event) override;
+	virtual void hideEvent(QHideEvent *event) override;
+	virtual void showEvent(QShowEvent *event) override;
+
+#ifdef Q_OS_MACOS
+	virtual bool event(QEvent *e) override;
+    virtual void moveEvent(QMoveEvent *event) override;
+#elif defined(Q_OS_UNIX)
+	virtual void moveEvent(QMoveEvent *event) override;
+	virtual void resizeEvent(QResizeEvent *event) override;
+	virtual bool event(QEvent *e) override;
+#endif
+
+#ifdef Q_OS_WIN
+	/**
+	 * Native event filter for handling WM_MOVING messages on Windows
+	 */
+#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
+    virtual bool nativeEvent(const QByteArray &eventType, void *message, long *result) override;
+#else
+    virtual bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;
+#endif
+#endif
+
+
+public:
+	using Super = tFloatingWidgetBase;
+
+	/**
+	 * Create empty floating widget - required for restore state
+	 */
+	CFloatingDockContainer(CDockManager* DockManager);
+
+	/**
+	 * Create floating widget with the given dock area
+	 */
+	CFloatingDockContainer(CDockAreaWidget* DockArea);
+
+	/**
+	 * Create floating widget with the given dock widget
+	 */
+	CFloatingDockContainer(CDockWidget* DockWidget);
+
+	/**
+	 * Virtual Destructor
+	 */
+	~CFloatingDockContainer() override;
+
+	/**
+	 * Access function for the internal dock container
+	 */
+	CDockContainerWidget* dockContainer() const;
+
+	/**
+	 * Call this function to start dragging the floating widget
+	 */
+    void startDragging(const QPoint& DragStartMousePos, const QSize& Size,
+        QWidget* MouseEventHandler)
+	{
+        startFloating(DragStartMousePos, Size, DraggingFloatingWidget, MouseEventHandler);
+	}
+
+	/**
+	 * This function returns true, if it can be closed.
+	 * It can be closed, if all dock widgets in all dock areas can be closed
+	 */
+    bool isClosable() const;
+
+    /**
+     * This function returns true, if this floating widget has only one single
+     * visible dock widget in a single visible dock area.
+     * The single dock widget is a real top level floating widget because no
+     * other widgets are docked.
+     */
+    bool hasTopLevelDockWidget() const;
+
+    /**
+     * This function returns the first dock widget in the first dock area.
+     * If the function hasSingleDockWidget() returns true, then this function
+     * returns this single dock widget.
+     */
+    CDockWidget* topLevelDockWidget() const;
+
+    /**
+     * This function returns a list of all dock widget in this floating widget.
+     * This is a simple convenience function that simply calls the dockWidgets()
+     * function of the internal container widget.
+     */
+    QList<CDockWidget*> dockWidgets() const;
+
+	/**
+	 * This function hides the floating widget instantly and delete it later.
+	 */
+	void finishDropOperation();
+
+#if defined(Q_OS_UNIX) && !defined(Q_OS_MACOS)
+    /**
+	 * This is a function that responds to FloatingWidgetTitleBar::maximizeRequest()
+	 * Maximize or normalize the container size.
+     */
+    void onMaximizeRequest();
+
+	/**
+	 * Normalize (Unmaximize) the window.
+	 *	fixGeometry parameter fixes a "bug" in QT where immediately after calling showNormal
+	 *	geometry is not set properly.
+	 *	Set this true when moving the window immediately after normalizing.
+	 */
+	void showNormal(bool fixGeometry=false);
+
+	/**
+	 * Maximizes the window.
+	 */
+	void showMaximized();
+
+	/**
+	 * Returns if the window is currently maximized or not.
+	 */
+	bool isMaximized() const;
+
+	/**
+	 * Patched show to prevent the window from appearing in the taskbar.
+	 */
+	void show();
+
+	/**
+	 * Returns true if the floating widget has a native titlebar or false if
+	 * the floating widget has a QWidget based title bar
+	 */
+	bool hasNativeTitleBar();
+#endif
+}; // class FloatingDockContainer
+}
+ // namespace ads
+//-----------------------------------------------------------------------------
+#endif // FloatingDockContainerH
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\FloatingDragPreview.h
+==================================================
+#ifndef FloatingDragPreviewH
+#define FloatingDragPreviewH
+//============================================================================
+/// \file   FloatingDragPreview.h
+/// \author Uwe Kindler
+/// \date   26.11.2019
+/// \brief  Declaration of CFloatingDragPreview
+//============================================================================
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include <QWidget>
+#include "FloatingDockContainer.h"
+
+namespace ads
+{
+class CDockWidget;
+class CDockAreaWidget;
+struct FloatingDragPreviewPrivate;
+
+/**
+ * A floating overlay is a temporary floating widget that is just used to
+ * indicate the floating widget movement.
+ * This widget is used as a placeholder for drag operations for non-opaque
+ * docking
+ */
+class CFloatingDragPreview : public QWidget, public IFloatingWidget
+{
+	Q_OBJECT
+private:
+	FloatingDragPreviewPrivate* d;
+	friend struct FloatingDragPreviewPrivate;
+
+private Q_SLOTS:
+	/**
+	 * Cancel non opaque undocking if application becomes inactive
+	 */
+	void onApplicationStateChanged(Qt::ApplicationState state);
+
+protected:
+	/**
+	 * Cares about painting the
+	 */
+	virtual void paintEvent(QPaintEvent *e) override;
+
+	/**
+	 * The content is a DockArea or a DockWidget
+	 */
+	CFloatingDragPreview(QWidget* Content, QWidget* parent);
+
+public:
+	using Super = QWidget;
+
+	/**
+	 * Creates an instance for undocking the DockWidget in Content parameter
+	 */
+	CFloatingDragPreview(CDockWidget* Content);
+
+	/**
+	 * Creates an instance for undocking the DockArea given in Content
+	 * parameters
+	 */
+	CFloatingDragPreview(CDockAreaWidget* Content);
+
+	/**
+	 * Delete private data
+	 */
+	~CFloatingDragPreview();
+
+    /**
+     * We filter the events of the assigned content widget to receive
+     * escape key presses for canceling the drag operation
+     */
+    virtual bool eventFilter(QObject *watched, QEvent *event) override;
+
+
+public: // implements IFloatingWidget -----------------------------------------
+	virtual void startFloating(const QPoint& DragStartMousePos, const QSize& Size,
+        eDragState DragState, QWidget* MouseEventHandler) override;
+
+	/**
+	 * Moves the widget to a new position relative to the position given when
+	 * startFloating() was called
+	 */
+	virtual void moveFloating() override;
+
+	/**
+	 * Finishes dragging.
+	 * Hides the dock overlays and executes the real undocking and docking
+	 * of the assigned Content widget
+	 */
+	virtual void finishDragging() override;
+
+	/**
+	 * Cleanup auto hide container if the dragged widget has one
+	 */
+	void cleanupAutoHideContainerWidget(DockWidgetArea ContainerDropArea);
+
+Q_SIGNALS:
+	/**
+	 * This signal is emitted, if dragging has been canceled by escape key
+	 * or by active application switching via task manager
+	 */
+	void draggingCanceled();
+};
+
+
+} // namespace ads
+
+//---------------------------------------------------------------------------
+#endif // FloatingDragPreviewH
+
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\IconProvider.h
+==================================================
+#ifndef IconProviderH
+#define IconProviderH
+//============================================================================
+/// \file   IconProvider.h
+/// \author Uwe Kindler
+/// \date   18.10.2019
+/// \brief  Declaration of CIconProvider
+//============================================================================
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include <QIcon>
+
+#include "ads_globals.h"
+
+namespace ads
+{
+
+struct IconProviderPrivate;
+
+/**
+ * This object provides all icons that are required by the advanced docking
+ * system.
+ * The IconProvider enables the user to register custom icons in case using
+ * stylesheets is not an option.
+ */
+class ADS_EXPORT CIconProvider
+{
+private:
+	IconProviderPrivate* d; ///< private data (pimpl)
+	friend struct IconProviderPrivate;
+
+public:
+	/**
+	 * Default Constructor
+	 */
+	CIconProvider();
+
+	/**
+	 * Virtual Destructor
+	 */
+	virtual ~CIconProvider();
+
+	/**
+	 * The function returns a custom icon if one is registered and a null Icon
+	 * if no custom icon is registered
+	 */
+	QIcon customIcon(eIcon IconId) const;
+
+	/**
+	 * Registers a custom icon for the given IconId
+	 */
+	void registerCustomIcon(eIcon IconId, const QIcon &icon);
+}; // class IconProvider
+
+} // namespace ads
+
+
+//---------------------------------------------------------------------------
+#endif // IconProviderH
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\PushButton.h
+==================================================
+#ifndef PushButtonH
+#define PushButtonH
+//============================================================================
+/// \file   PushButton.h
+/// \author Uwe Kindler
+/// \date   18.10.2022
+/// \brief  Declaration of CPushButton
+//============================================================================
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include "ads_globals.h"
+
+#include <QPushButton>
+
+namespace ads
+{
+
+/**
+ * ADS specific push button class with orientation support
+ */
+class ADS_EXPORT CPushButton : public QPushButton
+{
+    Q_OBJECT
+public:
+    enum Orientation {
+        Horizontal,
+        VerticalTopToBottom,
+        VerticalBottomToTop
+    };
+
+    using QPushButton::QPushButton;
+
+    virtual QSize sizeHint() const override;
+
+    /**
+     * Returns the current orientation
+     */
+    Orientation buttonOrientation() const;
+
+    /**
+     * Set the orientation of this button
+     */
+    void setButtonOrientation(Orientation orientation);
+
+protected:
+    virtual void paintEvent(QPaintEvent *event) override;
+
+private:
+    Orientation m_Orientation = Horizontal;
+};
+
+} // namespace ads
+
+//---------------------------------------------------------------------------
+#endif // PushButtonH
+
+
+==================================================
+FILE: .\third_party\qtads\include\qtadvanceddocking-qt6\ResizeHandle.h
+==================================================
+#ifndef ResizeHandleH
+#define ResizeHandleH
+//============================================================================
+/// \file   ResizeHandle.h
+/// \author Uwe Kindler
+/// \date   24.10.2022
+/// \brief  Declaration of CResizeHandle class
+//============================================================================
+
+//============================================================================
+//                                   INCLUDES
+//============================================================================
+#include "ads_globals.h"
+#include <QFrame>
+
+namespace ads
+{
+struct ResizeHandlePrivate;
+
+/**
+ * Resize handle for resizing its parent widget
+ */
+class ADS_EXPORT CResizeHandle : public QFrame
+{
+	Q_OBJECT
+	Q_DISABLE_COPY(CResizeHandle)
+    Q_PROPERTY(bool opaqueResize READ opaqueResize WRITE setOpaqueResize)
+private:
+	ResizeHandlePrivate* d; ///< private data (pimpl)
+	friend struct ResizeHandlePrivate;
+
+protected:
+	void mouseMoveEvent(QMouseEvent *) override;
+    void mousePressEvent(QMouseEvent *) override;
+    void mouseReleaseEvent(QMouseEvent *) override;
+
+public:
+	using Super = QFrame;
+
+	/**
+	 * Default Constructor
+	 */
+	CResizeHandle(Qt::Edge HandlePosition, QWidget* parent);
+
+	/**
+	 * Virtual Destructor
+	 */
+	virtual ~CResizeHandle();
+
+	/**
+	 * Sets the handle position
+	 */
+	void setHandlePosition(Qt::Edge HandlePosition);
+
+	/**
+	 * Returns the handle position
+	 */
+	Qt::Edge handlePostion() const;
+
+	/**
+	 * Returns the orientation of this resize handle
+	 */
+	Qt::Orientation orientation() const;
+
+	/**
+	 * Returns the size hint
+	 */
+	QSize sizeHint() const override;
+
+	/**
+	 * Returns true, if resizing is active
+	 */
+	bool isResizing() const;
+
+	/**
+	 * Sets the minimum size for the widget that is going to be resized.
+	 * The resize handle will not resize the target widget to a size smaller
+	 * than this value
+	 */
+	void setMinResizeSize(int MinSize);
+
+	/**
+	 * Sets the maximum size for the widget that is going to be resized
+	 * The resize handle will not resize the target widget to a size bigger
+	 * than this value
+	 */
+	void setMaxResizeSize(int MaxSize);
+
+	/**
+	 * Enable / disable opaque resizing
+	 */
+	void setOpaqueResize(bool opaque = true);
+
+	/**
+	 * Returns true if widgets are resized dynamically (opaquely) while
+	 * interactively moving the resize handle. Otherwise returns false.
+	 */
+	bool opaqueResize() const;
+}; // class name
+} // namespace ads
+//-----------------------------------------------------------------------------
+#endif // ResizeHandleH
