@@ -34,34 +34,70 @@ This template is designed to be **Structural Complete**: you never change the fi
 
 ## Usage
 
-### 1. Build
+### 🚀 Quick Start (Windows)
+The easiest way to work with this project is using the included **`Build.bat`** script. It handles environment setup, building, testing, and packaging automatically.
+
+1. Double-click `Build.bat`
+2. Select an option:
+   - **[1/2]**: Build Debug/Release
+   - **[9]**: Create Installer (Package)
+
+### Manual CLI
+If you prefer standard CMake commands:
+
+**Build:**
 ```bash
-cmake -S . -B build
-cmake --build build
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release
 ```
 
-### 2. Run Tests
+**Test:**
 ```bash
 cd build
-ctest --output-on-failure
+ctest -C Release --output-on-failure
 ```
 
-### 3. Add Dependencies
-Open `cmake/FetchDependencies.cmake` and add your `FetchContent_Declare`.
+## Packaging & Deployment
+This template supports one-click creation of **Installers (.exe)** and **Portable Zips**.
 
-### 4. Enable Sanitizers
-Sanitizers are OFF by default. Enable them at configuration time:
+### Prerequisites
+To generate the `.exe` installer, you need **NSIS**. Install it via Winget:
+```powershell
+winget install NSIS.NSIS
+```
+
+### Creating the Installer
+1. Run `Build.bat`
+2. Select **Option 9: Create Installer (Package)**
+3. The script will:
+   - Clean & Rebuild (Release)
+   - Run `windeployqt` to copy necessary Qt DLLs
+   - Run `CPack` to generate the installer
+   - **Auto-Sign** the installer using a generated Self-Signed Certificate
+
+**Output Location:** `build/QtTemplateProject-*-win64.exe` (and `.zip`)
+
+### Code Signing
+The project includes a helper script (`scripts/SignInstaller.ps1`) that:
+- Automatically looks for `signtool.exe` (Windows SDK).
+- Generates a **Self-Signed Certificate** (`QtTemplateDevCert.pfx`) if one is missing.
+- Signs both the Application Binary (`QtTemplateApp.exe`) and the Installer (`setup.exe`).
+
+> **Note:** Because the certificate is self-signed, Windows Defender/SmartScreen will show an "Unknown Publisher" warning. To remove this, replace the generated `.pfx` with a valid Code Signing Certificate bought from a generic CA.
+
+## Configuration (.env)
+The project supports dynamic environment configuration.
+1. Create a `.env` file in the root.
+2. Define variables like `API_URL=https://api.staging.com`.
+3. These are compiled into `src/generated/env_config.h`.
+
+## Advanced Features
+**Sanitizers (ASan/Leak):**
 ```bash
 cmake -S . -B build -DENABLE_SANITIZER_ADDRESS=ON
 ```
-Available options:
-- `ENABLE_SANITIZER_ADDRESS`
-- `ENABLE_SANITIZER_LEAK`
-- `ENABLE_SANITIZER_UNDEFINED`
-- `ENABLE_SANITIZER_THREAD`
-- `ENABLE_SANITIZER_MEMORY` (Clang only)
 
-### 5. Static Analysis
+**Static Analysis:**
 ```bash
-cmake -S . -B build -DENABLE_CLANG_TIDY=ON -DENABLE_CPPCHECK=ON
+cmake -S . -B build -DENABLE_CLANG_TIDY=ON
 ```
