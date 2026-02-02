@@ -15,8 +15,13 @@ include(FetchContent)
 #   3. Update the URL_HASH below
 #
 
+# Configurable dependency versions (override via -D flags if needed)
+set(GTEST_VERSION "1.14.0" CACHE STRING "GoogleTest version")
+set(FMT_VERSION "10.1.1" CACHE STRING "fmt library version")
+set(SPDLOG_VERSION "1.12.0" CACHE STRING "spdlog library version")
+
 # Function to fetch all dependencies
-macro(fetch_project_dependencies)
+function(fetch_project_dependencies)
 
     # --- GoogleTest v1.14.0 ---
     # https://github.com/google/googletest/releases
@@ -70,4 +75,4 @@ macro(fetch_project_dependencies)
         message(STATUS "Found system spdlog: ${spdlog_VERSION}")
     endif()
 
-endmacro()
+endfunction()

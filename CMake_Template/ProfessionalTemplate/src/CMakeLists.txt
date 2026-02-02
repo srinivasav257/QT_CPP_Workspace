@@ -43,12 +43,13 @@ if(WIN32)
     set_target_properties(QtTemplateApp PROPERTIES WIN32_EXECUTABLE ON)
 endif()
 
-# Enable deployment targets (make QtTemplateApp_deploy)
-add_deployment_support(QtTemplateApp)
-
-# Configure Installation & Exports
+# Configure Installation & Exports (must come BEFORE deployment for correct install order)
 # This generates QtTemplateProjectConfig.cmake so others can find_package() it
 setup_install_rules(QtTemplateProject QtTemplateApp)
+
+# Enable deployment targets (make QtTemplateApp_deploy)
+# Note: Must be after setup_install_rules() so windeployqt runs after exe is installed
+add_deployment_support(QtTemplateApp)
 
 # Generate typed Environment Header (env_config.h)
 generate_env_header(QtTemplateApp)

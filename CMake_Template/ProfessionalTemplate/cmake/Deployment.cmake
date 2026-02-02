@@ -33,7 +33,7 @@ function(add_deployment_support target_name)
             )
             message(STATUS "Deployment: Added target '${target_name}_deploy' (windeployqt)")
 
-            # 2. Install Step (Run automaticall via CPack/Install) - Deploys to INSTALL directory
+            # 2. Install Step (Run automatically via CPack/Install) - Deploys to INSTALL directory
             # We use a CMake script snippet to run windeployqt at install time
             install(CODE "
                 message(STATUS \"Deploying Qt dependencies to install prefix...\")
@@ -45,7 +45,11 @@ function(add_deployment_support target_name)
                             --libdir \"\${CMAKE_INSTALL_PREFIX}/bin\"
                             --plugindir \"\${CMAKE_INSTALL_PREFIX}/bin/plugins\"
                             \"\${CMAKE_INSTALL_PREFIX}/bin/$<TARGET_FILE_NAME:${target_name}>\"
+                    RESULT_VARIABLE deploy_result
                 )
+                if(NOT deploy_result EQUAL 0)
+                    message(FATAL_ERROR \"windeployqt failed with exit code: \${deploy_result}\")
+                endif()
             ")
 
         else()
@@ -66,7 +70,7 @@ function(add_deployment_support target_name)
         if(MACDEPLOYQT_EXECUTABLE)
             add_custom_target(${target_name}_deploy
                 COMMAND ${MACDEPLOYQT_EXECUTABLE} $<TARGET_BUNDLE_DIR:${target_name}> -dmg
-                COMMENT "Runing macdeployqt (creating DMG)..."
+                COMMENT "Running macdeployqt (creating DMG)..."
                 VERBATIM
             )
              message(STATUS "Deployment: Added target '${target_name}_deploy' (macdeployqt)")
