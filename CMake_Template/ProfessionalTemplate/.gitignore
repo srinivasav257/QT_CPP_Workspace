@@ -24,3 +24,5 @@ ui_*.h
 *.sln
 *.vcxproj
 *.vcxproj.filters
+
+*.pfx
