@@ -26,6 +26,7 @@ include(StandardSettings)
 include(CompilerWarnings)
 include(Sanitizers)
 include(StaticAnalyzers)
+include(Coverage)
 include(FetchDependencies)
 include(AutoVersion)
 include(PrecompiledHeaders)
@@ -43,7 +44,9 @@ add_config_var(API_TIMEOUT_MS INT 5000 "Network timeout in ms")
 add_config_var(ENABLE_DEBUG_MENU BOOL ON "Enable debug menu")
 
 # --- Dependencies ---
-find_package(Qt6 COMPONENTS Core Gui Widgets Test REQUIRED)
+# Qt 6.2+ required for modern features (Qt Quick Compiler, better CMake support)
+find_package(Qt6 6.2 COMPONENTS Core Gui Widgets Test REQUIRED)
+message(STATUS "Found Qt ${Qt6_VERSION}")
 
 # Global Qt Integration
 set(CMAKE_AUTOUIC ON)
