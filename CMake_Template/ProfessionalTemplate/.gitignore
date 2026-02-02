@@ -13,8 +13,6 @@ compile_commands.json
 # Qt
 *.user
 *.moc
-*.ui
-*.qrc
 *.rcc
 ui_*.h
 
