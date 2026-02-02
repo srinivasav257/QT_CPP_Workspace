@@ -1,0 +1,26 @@
+# CMake
+/build*
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Makefile
+cmake_install.cmake
+install_manifest.txt
+*.cmake
+!cmake/*.cmake
+compile_commands.json
+
+# Qt
+*.user
+*.moc
+*.ui
+*.qrc
+*.rcc
+ui_*.h
+
+# IDEs
+.vscode
+.idea
+*.sln
+*.vcxproj
+*.vcxproj.filters
