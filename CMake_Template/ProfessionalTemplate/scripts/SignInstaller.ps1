@@ -18,7 +18,7 @@ param (
     [string]$TargetFile,
 
     [string]$PfxFile = "",
-    [string]$Password = "password"
+    [string]$Password = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -56,19 +56,28 @@ $CertPath = $PfxFile
 if ([string]::IsNullOrEmpty($CertPath)) {
     $CertName = "QtTemplateDevCert"
     $CertPath = "$PSScriptRoot\$CertName.pfx"
-    
+
     if (-not (Test-Path $CertPath)) {
         Write-Host "[INFO] Creating Self-Signed Certificate..."
         $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=QtTemplate Development" -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddYears(5)
-        
-        # Export to PFX
-        $pwd = ConvertTo-SecureString -String $Password -Force -AsPlainText
+
+        # Prompt for password if not provided
+        if ([string]::IsNullOrEmpty($Password)) {
+            $pwd = Read-Host "Enter PFX password" -AsSecureString
+        } else {
+            $pwd = ConvertTo-SecureString -String $Password -Force -AsPlainText
+        }
         Export-PfxCertificate -Cert "Cert:\CurrentUser\My\$($cert.Thumbprint)" -FilePath $CertPath -Password $pwd
-        
+
         Write-Host "[INFO] Created Certificate: $CertPath"
     } else {
         Write-Host "[INFO] Using existing Self-Signed Certificate: $CertPath"
     }
+}
+
+# Prompt for password at sign time if not provided
+if ([string]::IsNullOrEmpty($Password)) {
+    $Password = Read-Host "Enter PFX password"
 }
 
 # 3. Sign the File

@@ -34,7 +34,14 @@ function(add_deployment_support target_name)
             message(STATUS "Deployment: Added target '${target_name}_deploy' (windeployqt)")
 
             # 2. Install Step (Run automatically via CPack/Install) - Deploys to INSTALL directory
-            # We use a CMake script snippet to run windeployqt at install time
+            # Resolve target output name at configure time to avoid generator expression
+            # issues inside install(CODE) on some generators
+            get_target_property(_output_name ${target_name} OUTPUT_NAME)
+            if(NOT _output_name)
+                set(_output_name "${target_name}")
+            endif()
+            set(_exe_filename "${_output_name}${CMAKE_EXECUTABLE_SUFFIX}")
+
             install(CODE "
                 message(STATUS \"Deploying Qt dependencies to install prefix...\")
                 execute_process(
@@ -44,7 +51,7 @@ function(add_deployment_support target_name)
                             --no-compiler-runtime
                             --libdir \"\${CMAKE_INSTALL_PREFIX}/bin\"
                             --plugindir \"\${CMAKE_INSTALL_PREFIX}/bin/plugins\"
-                            \"\${CMAKE_INSTALL_PREFIX}/bin/$<TARGET_FILE_NAME:${target_name}>\"
+                            \"\${CMAKE_INSTALL_PREFIX}/bin/${_exe_filename}\"
                     RESULT_VARIABLE deploy_result
                 )
                 if(NOT deploy_result EQUAL 0)

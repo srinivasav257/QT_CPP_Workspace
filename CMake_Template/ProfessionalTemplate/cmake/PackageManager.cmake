@@ -37,20 +37,32 @@ cmake_layout
     endif()
 
     # 4. Run Conan Install
-    # We need to know the build type. If not set, assume Release for the install step.
-    if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-        set(_CONAN_BUILD_TYPE "Release")
+    if(CMAKE_CONFIGURATION_TYPES)
+        # Multi-config generator (Visual Studio, Ninja Multi-Config): install for each configuration
+        foreach(_cfg IN LISTS CMAKE_CONFIGURATION_TYPES)
+            message(STATUS "Running Conan Install (Build Type: ${_cfg})...")
+            execute_process(COMMAND ${CONAN_CMD} install . --build=missing -s build_type=${_cfg}
+                            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                            RESULT_VARIABLE CONAN_INSTALL_RESULT)
+            if(NOT CONAN_INSTALL_RESULT EQUAL 0)
+                message(WARNING "Conan install failed for build type '${_cfg}'. Check output.")
+            endif()
+        endforeach()
     else()
-        set(_CONAN_BUILD_TYPE ${CMAKE_BUILD_TYPE})
-    endif()
+        # Single-config generator: use CMAKE_BUILD_TYPE, defaulting to Release
+        if(NOT CMAKE_BUILD_TYPE)
+            set(_CONAN_BUILD_TYPE "Release")
+        else()
+            set(_CONAN_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
+        endif()
 
-    message(STATUS "Running Conan Install (Build Type: ${_CONAN_BUILD_TYPE})...")
-    execute_process(COMMAND ${CONAN_CMD} install . --build=missing -s build_type=${_CONAN_BUILD_TYPE}
-                    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-                    RESULT_VARIABLE CONAN_INSTALL_RESULT)
-    
-    if(NOT CONAN_INSTALL_RESULT EQUAL 0)
-        message(WARNING "Conan install failed. Check output.")
+        message(STATUS "Running Conan Install (Build Type: ${_CONAN_BUILD_TYPE})...")
+        execute_process(COMMAND ${CONAN_CMD} install . --build=missing -s build_type=${_CONAN_BUILD_TYPE}
+                        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                        RESULT_VARIABLE CONAN_INSTALL_RESULT)
+        if(NOT CONAN_INSTALL_RESULT EQUAL 0)
+            message(WARNING "Conan install failed. Check output.")
+        endif()
     endif()
 
     # 5. Set Toolchain if generated

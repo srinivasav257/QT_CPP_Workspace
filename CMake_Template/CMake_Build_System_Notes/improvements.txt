@@ -1,0 +1,179 @@
+Full code review of ProfessionalTemplate, organized by severity, with file references, reasoning, and suggested fixes.
+All issues have been resolved.
+
+Summary Table
+| Severity | Total | Fixed |
+| Critical |   2   |   2   |
+| High     |   5   |   5   |
+| Medium   |   5   |   5   |
+| Low      |   4   |   4   |
+
+================================================================================
+Critical (Fixed)
+================================================================================
+
+1) [FIXED] SuperBuild fails to configure due to invalid CMake statement
+Path: cmake/SuperBuild.cmake
+Was: EXTERNALPROCESS_AUTORUN=OFF (shell syntax, not CMake) broke the entire SuperBuild path.
+Fix applied: removed the invalid line.
+
+2) [FIXED] Boolean config vars generate invalid C++
+Path: cmake/EnvConfig.cmake
+Was: add_config_var(... BOOL ...) emitted `static constexpr bool X = ON;` which is not valid C++.
+Fix applied: added normalize_cmake_bool() function that converts ON/OFF/TRUE/FALSE/1/0/YES/NO
+to C++ true/false. Normalization runs both at add_config_var() time and again in
+generate_env_header() to catch values that may have been overridden from the cache.
+
+================================================================================
+High (Fixed)
+================================================================================
+
+1) [FIXED] APP_ENVIRONMENT uses option() incorrectly
+Path: cmake/EnvConfig.cmake
+Was: option(APP_ENVIRONMENT ...) is for booleans only.
+Fix applied: replaced with:
+  set(APP_ENVIRONMENT "Development" CACHE STRING "Application Environment (Development, Staging, Production)")
+  set_property(CACHE APP_ENVIRONMENT PROPERTY STRINGS "Development" "Staging" "Production")
+
+2) [FIXED] AutoVersion does not propagate the computed version
+Path: cmake/AutoVersion.cmake
+Was: the version was computed inside generate_auto_version() but never reached the caller.
+Fix applied: added PARENT_SCOPE for PROJECT_VERSION, PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR,
+PROJECT_VERSION_PATCH, PROJECT_VERSION_TWEAK, PROJECT_VERSION_FULL, and PROJECT_GIT_HASH.
+
+3) [FIXED] Signing script ships a default password
+Path: scripts/SignInstaller.ps1
+Was: $Password defaulted to "password", a clear security risk.
+Fix applied: $Password now defaults to empty string. When empty, the script prompts
+interactively via Read-Host -AsSecureString (for cert creation) and Read-Host (for signing).
+
+4) [FIXED] SuperBuild downloads unverified archives (supply-chain risk)
+Path: cmake/SuperBuild.cmake
+Was: all ExternalProject_Add URLs lacked URL_HASH verification.
+Fix applied: added URL_HASH SHA256=... for all three dependencies (fmt, spdlog, googletest),
+matching the safety already present in FetchDependencies.cmake.
+
+5) [FIXED] Conan multi-config handling is fragile
+Path: cmake/PackageManager.cmake
+Was: with multi-config generators (Visual Studio), CMAKE_BUILD_TYPE is empty, causing
+Conan to install with an empty build type.
+Fix applied: when CMAKE_CONFIGURATION_TYPES is set, Conan install now iterates over
+each configuration type. For single-config generators, it falls back to CMAKE_BUILD_TYPE
+or defaults to Release.
+
+================================================================================
+Medium (Fixed)
+================================================================================
+
+1) [FIXED] Coverage flags are a single string instead of a CMake list
+Path: cmake/Coverage.cmake
+Was: `set(COVERAGE_COMPILE_FLAGS "-fprofile-arcs -ftest-coverage")` treated as one argument.
+Fix applied: changed to unquoted list:
+  set(COVERAGE_COMPILE_FLAGS -fprofile-arcs -ftest-coverage)
+
+2) [FIXED] Duplicate ENABLE_COVERAGE definition in Sanitizers.cmake
+Path: cmake/Sanitizers.cmake
+Was: option(ENABLE_COVERAGE ...) duplicated what Coverage.cmake defines, with conflicting logic.
+Fix applied: removed the duplicate option and coverage block; replaced with a comment
+pointing to Coverage.cmake as the single source of truth.
+
+3) [FIXED] lcov with Clang needs a wrapper script for llvm-cov gcov
+Path: cmake/Coverage.cmake
+Was: "${LLVM_COV_PATH} gcov" was passed as a single token containing a space.
+Fix applied: a wrapper shell script (llvm-gcov.sh) is now generated at configure time
+that runs `exec llvm-cov gcov "$@"`, and its path is passed to --gcov-tool.
+
+4) [FIXED] Windows build script signs the wrong path
+Path: Run_Build.bat
+Was: checked `src\Release\QtTemplateApp.exe` but the build output is in `build\src\Release\`.
+Fix applied: updated to `build\src\Release\QtTemplateApp.exe` and corrected the script
+path to `scripts\SignInstaller.ps1`.
+
+5) [FIXED] .env parsing lacks key validation
+Path: cmake/EnvConfig.cmake
+Was: no validation of key names; semicolons in values could break variable parsing.
+Fix applied: added regex validation:
+  if(NOT KEY MATCHES "^[A-Za-z_][A-Za-z0-9_]*$")
+    message(FATAL_ERROR "EnvConfig: Invalid .env key: '${KEY}'")
+  endif()
+Also removed the FORCE flag from cache set (now only sets if NOT DEFINED, respecting CLI overrides).
+
+6) [FIXED] install(CODE) generator expression compatibility
+Path: cmake/Deployment.cmake
+Was: $<TARGET_FILE_NAME:...> inside install(CODE) may not expand on all generators.
+Fix applied: replaced with get_target_property(OUTPUT_NAME) at configure time,
+falling back to the target name if OUTPUT_NAME is not set.
+
+================================================================================
+Low (Fixed)
+================================================================================
+
+1) [FIXED] CodeFormatTargets contains unused glob
+Path: cmake/CodeFormatTargets.cmake
+Was: file(GLOB_RECURSE CMAKE_FILES ...) computed but never used; ** is not meaningful in CMake.
+Fix applied: removed the dead glob. The code now directly builds CMAKE_TARGET_FILES.
+
+2) [FIXED] load_dotenv always forces cache overwrite
+Path: cmake/EnvConfig.cmake
+Was: CACHE ... FORCE would override command-line values.
+Fix applied: removed FORCE; the cache is now set without FORCE inside the existing
+if(NOT DEFINED ${KEY}) guard, so CLI overrides are respected.
+
+3) [FIXED] Empty destructor in MainWindow
+Paths: src/MainWindow.cpp, src/MainWindow.h
+Was: empty destructor body adding noise.
+Fix applied: declared `~MainWindow() override = default;` in the header and removed
+the .cpp definition entirely.
+
+4) [NOT AN ISSUE] README tree encoding
+Path: README.md
+Original report: box-drawing characters were garbled.
+Current state: the file is correctly encoded in UTF-8 and renders properly.
+This was a false positive, likely caused by the reviewer's terminal or editor encoding.
+
+================================================================================
+Strengths (and why they matter)
+================================================================================
+
+1) Modular CMake architecture (cmake/*)
+Each concern is isolated into its own module. This keeps the template scalable,
+maintainable, and easy for new contributors to navigate.
+
+2) Build hygiene (cmake/PreventInSourceBuilds.cmake)
+Prevents accidental in-source builds that pollute the source tree and cause
+hard-to-debug issues.
+
+3) Cross-platform CI (.github/workflows/ci.yml)
+Validates Windows, Linux, and macOS in a single workflow, which is a real-world
+requirement for Qt projects.
+
+4) SHA256 verification for FetchContent and SuperBuild
+Both cmake/FetchDependencies.cmake and cmake/SuperBuild.cmake now verify
+archive integrity via SHA256 hashes, protecting against supply-chain tampering.
+
+5) CMake presets and workflows (CMakePresets.json)
+Provides a consistent developer experience across platforms and reduces
+"works on my machine" friction.
+
+6) Optional advanced tooling (warnings, sanitizers, static analyzers)
+Makes high-rigor builds available via opt-in flags without forcing them
+on every developer.
+
+================================================================================
+Architectural/Design-level Improvements (future considerations)
+================================================================================
+
+- Introduce interface targets (e.g. project_options, project_warnings) to centralize
+  compile options and keep per-target opt-in consistent.
+
+- Add a single ProjectOptions.cmake to collect all toggles (sanitizers, coverage, PCH)
+  and document defaults in one place.
+
+- Define a dependency source-of-truth policy (system packages vs FetchContent vs
+  package manager) to avoid mixed states.
+
+- Split CI into build vs quality workflows so formatting checks are not fail-open
+  and overall pipeline time is reduced.
+
+- Add a brief security note in README about .env handling and signing expectations
+  for template users.

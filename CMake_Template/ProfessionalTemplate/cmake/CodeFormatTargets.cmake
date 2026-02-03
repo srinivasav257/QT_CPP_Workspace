@@ -23,14 +23,7 @@ function(add_format_targets)
     # 2. CMake Formatting (cmake-format)
     find_program(CMAKE_FORMAT_EXE cmake-format)
     if(CMAKE_FORMAT_EXE)
-        # Find all .cmake and CMakeLists.txt files
-        file(GLOB_RECURSE CMAKE_FILES 
-             "${CMAKE_SOURCE_DIR}/*.cmake" 
-             "${CMAKE_SOURCE_DIR}/**/CMakeLists.txt"
-        )
-        
-        # Exclude build directories roughly if possible, or assume user runs from root
-        # A simpler approach is listing specific roots
+        # List specific CMake files to format (avoids globbing into build directories)
         set(CMAKE_TARGET_FILES
             "${CMAKE_SOURCE_DIR}/CMakeLists.txt"
             "${CMAKE_SOURCE_DIR}/src/CMakeLists.txt"

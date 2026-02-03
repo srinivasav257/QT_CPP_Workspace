@@ -53,6 +53,15 @@ function(generate_auto_version)
         "${CMAKE_BINARY_DIR}/generated/version.h"
         @ONLY
     )
+
+    # Propagate version variables to parent scope
+    set(PROJECT_VERSION "${PROJECT_VERSION}" PARENT_SCOPE)
+    set(PROJECT_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}" PARENT_SCOPE)
+    set(PROJECT_VERSION_MINOR "${PROJECT_VERSION_MINOR}" PARENT_SCOPE)
+    set(PROJECT_VERSION_PATCH "${PROJECT_VERSION_PATCH}" PARENT_SCOPE)
+    set(PROJECT_VERSION_TWEAK "${PROJECT_VERSION_TWEAK}" PARENT_SCOPE)
+    set(PROJECT_VERSION_FULL "${PROJECT_VERSION_FULL}" PARENT_SCOPE)
+    set(PROJECT_GIT_HASH "${PROJECT_GIT_HASH}" PARENT_SCOPE)
 endfunction()
 
 # Wrapper to link the generated header

@@ -157,8 +157,8 @@ if %errorlevel% neq 0 pause && goto EOF
 
 :: Sign the Application Executable (so the ZIP version is also signed)
 echo [INFO] Signing Application Binary...
-if exist "src\Release\QtTemplateApp.exe" (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "..\scripts\SignInstaller.ps1" -TargetFile "src\Release\QtTemplateApp.exe"
+if exist "build\src\Release\QtTemplateApp.exe" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\SignInstaller.ps1" -TargetFile "build\src\Release\QtTemplateApp.exe"
 )
 
 echo [INFO] Packaging (CPack)...

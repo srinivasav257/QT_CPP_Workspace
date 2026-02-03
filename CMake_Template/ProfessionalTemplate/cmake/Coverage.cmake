@@ -16,14 +16,14 @@ if(ENABLE_COVERAGE)
 
     # Check compiler support
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        # GCC/Clang coverage flags
-        set(COVERAGE_COMPILE_FLAGS "-fprofile-arcs -ftest-coverage")
-        set(COVERAGE_LINK_FLAGS "-fprofile-arcs -ftest-coverage")
+        # GCC/Clang coverage flags (must be a list, not a single string)
+        set(COVERAGE_COMPILE_FLAGS -fprofile-arcs -ftest-coverage)
+        set(COVERAGE_LINK_FLAGS -fprofile-arcs -ftest-coverage)
 
         if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
             # Clang uses different flags for newer versions
-            set(COVERAGE_COMPILE_FLAGS "--coverage")
-            set(COVERAGE_LINK_FLAGS "--coverage")
+            set(COVERAGE_COMPILE_FLAGS --coverage)
+            set(COVERAGE_LINK_FLAGS --coverage)
         endif()
     elseif(MSVC)
         message(WARNING "Code coverage is not well supported on MSVC. Consider using OpenCppCoverage externally.")
@@ -75,7 +75,12 @@ function(add_coverage_target)
 
         # Determine gcov executable
         if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND LLVM_COV_PATH)
-            set(GCOV_TOOL "${LLVM_COV_PATH} gcov")
+            # llvm-cov must be called as "llvm-cov gcov", but lcov --gcov-tool
+            # expects a single executable. Create a wrapper script.
+            set(GCOV_WRAPPER "${CMAKE_BINARY_DIR}/llvm-gcov.sh")
+            file(WRITE "${GCOV_WRAPPER}" "#!/bin/sh\nexec \"${LLVM_COV_PATH}\" gcov \"$@\"\n")
+            file(CHMOD "${GCOV_WRAPPER}" PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
+            set(GCOV_TOOL "${GCOV_WRAPPER}")
         elseif(GCOV_PATH)
             set(GCOV_TOOL "${GCOV_PATH}")
         else()

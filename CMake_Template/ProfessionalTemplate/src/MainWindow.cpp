@@ -12,7 +12,3 @@ MainWindow::MainWindow(QWidget *parent)
     label->setAlignment(Qt::AlignCenter);
     setCentralWidget(label);
 }
-
-MainWindow::~MainWindow()
-{
-}
