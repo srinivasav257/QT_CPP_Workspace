@@ -36,6 +36,8 @@ function(fetch_project_dependencies)
         )
         # Prevent overriding parent project's compiler/linker settings on Windows
         set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+        # Don't install test framework headers/libs into the package
+        set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
         FetchContent_MakeAvailable(googletest)
     else()
         message(STATUS "Found system GoogleTest: ${GTest_VERSION}")
@@ -53,6 +55,8 @@ function(fetch_project_dependencies)
             URL_HASH SHA256=3c2e73019178ad72b0614a3124f25de454b9ca3a1afe81d5447b8d3cbdb6d322
             DOWNLOAD_EXTRACT_TIMESTAMP TRUE
         )
+        # Don't install fmt headers/libs into the package
+        set(FMT_INSTALL OFF CACHE BOOL "" FORCE)
         FetchContent_MakeAvailable(fmt)
     else()
         message(STATUS "Found system fmt: ${fmt_VERSION}")
@@ -70,6 +74,8 @@ function(fetch_project_dependencies)
             URL_HASH SHA256=6174bf8885287422a6c6a0312eb8a30e8d22bcfcee7c48a6d02d1835d7769232
             DOWNLOAD_EXTRACT_TIMESTAMP TRUE
         )
+        # Don't install spdlog headers/libs into the package
+        set(SPDLOG_INSTALL OFF CACHE BOOL "" FORCE)
         FetchContent_MakeAvailable(spdlog)
     else()
         message(STATUS "Found system spdlog: ${spdlog_VERSION}")

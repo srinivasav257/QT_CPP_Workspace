@@ -23,10 +23,13 @@ function(add_deployment_support target_name)
             # 1. Custom Target (Run manually) - Deploys to BUILD directory
             add_custom_target(${target_name}_deploy
                 COMMAND ${CMAKE_COMMAND} -E echo "Running windeployqt on $<TARGET_FILE:${target_name}>..."
-                COMMAND ${WINDEPLOYQT_EXECUTABLE} 
-                        --dir $<TARGET_FILE_DIR:${target_name}> 
-                        --no-translations 
+                COMMAND ${WINDEPLOYQT_EXECUTABLE}
+                        --dir $<TARGET_FILE_DIR:${target_name}>
+                        --no-translations
                         --no-compiler-runtime
+                        --no-network
+                        --no-system-d3d-compiler
+                        --no-opengl-sw
                         $<TARGET_FILE:${target_name}>
                 COMMENT "Deploying Qt dependencies for Windows..."
                 VERBATIM
@@ -49,6 +52,9 @@ function(add_deployment_support target_name)
                             --dir \"\${CMAKE_INSTALL_PREFIX}/bin\"
                             --no-translations
                             --no-compiler-runtime
+                            --no-network
+                            --no-system-d3d-compiler
+                            --no-opengl-sw
                             --libdir \"\${CMAKE_INSTALL_PREFIX}/bin\"
                             --plugindir \"\${CMAKE_INSTALL_PREFIX}/bin/plugins\"
                             \"\${CMAKE_INSTALL_PREFIX}/bin/${_exe_filename}\"
