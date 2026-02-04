@@ -1,18 +1,14 @@
 include(FetchContent)
 
 # FetchDependencies.cmake
-# Fetches third-party dependencies with SHA256 verification for security.
-# Uses find_package fallback to prefer system-installed packages when available.
+# Manages third-party dependencies: pre-compiled local libraries and fetched sources.
 #
-# SHA256 hashes ensure:
-#   1. Integrity: Downloaded files haven't been corrupted
-#   2. Security: Protection against supply-chain attacks
-#   3. Reproducibility: Same source every time
+# Pre-compiled libraries (third_party/):
+#   - GoogleTest (gtest, gmock) — shared/import libraries
+#   - Qt Advanced Docking System (qtads) — shared/import libraries
 #
-# To update a dependency:
-#   1. Change the URL/version
-#   2. Download the new archive and compute: shasum -a 256 <file>
-#   3. Update the URL_HASH below
+# Fetched libraries (via FetchContent):
+#   - fmt, spdlog — downloaded with SHA256 verification
 #
 
 # Configurable dependency versions (override via -D flags if needed)
@@ -23,29 +19,86 @@ set(SPDLOG_VERSION "1.12.0" CACHE STRING "spdlog library version")
 # Function to fetch all dependencies
 function(fetch_project_dependencies)
 
-    # --- GoogleTest v1.14.0 ---
-    # https://github.com/google/googletest/releases
-    find_package(GTest NAMES GTest googletest QUIET)
-    if(NOT GTest_FOUND)
-        message(STATUS "Fetching GoogleTest v1.14.0...")
-        FetchContent_Declare(
-            googletest
-            URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
-            URL_HASH SHA256=1f357c27ca988c3f7c6b4bf68a9395005ac6761f034046e9dde0896e3aba00e4
-            DOWNLOAD_EXTRACT_TIMESTAMP TRUE
-        )
-        # Prevent overriding parent project's compiler/linker settings on Windows
-        set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-        # Don't install test framework headers/libs into the package
-        set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
-        FetchContent_MakeAvailable(googletest)
-    else()
-        message(STATUS "Found system GoogleTest: ${GTest_VERSION}")
+    # =========================================================================
+    # GoogleTest (pre-compiled local libraries)
+    # =========================================================================
+    set(GTEST_DIR "${CMAKE_SOURCE_DIR}/third_party/gtest")
+
+    if(NOT EXISTS "${GTEST_DIR}/include/gtest/gtest.h")
+        message(FATAL_ERROR "Pre-compiled GoogleTest not found at ${GTEST_DIR}. "
+            "Please ensure third_party/gtest contains include/, lib/, and bin/ directories.")
     endif()
 
-    # --- fmt v10.1.1 ---
-    # https://github.com/fmtlib/fmt/releases
-    # Modern C++ formatting library (std::format predecessor)
+    message(STATUS "Using pre-compiled GoogleTest (static) from ${GTEST_DIR}")
+
+    # GTest::gtest
+    add_library(GTest::gtest STATIC IMPORTED GLOBAL)
+    set_target_properties(GTest::gtest PROPERTIES
+        IMPORTED_LOCATION_DEBUG           "${GTEST_DIR}/lib/Debug/gtest.lib"
+        IMPORTED_LOCATION_RELEASE         "${GTEST_DIR}/lib/Release/gtest.lib"
+        IMPORTED_LOCATION_RELWITHDEBINFO  "${GTEST_DIR}/lib/Release/gtest.lib"
+        IMPORTED_LOCATION_MINSIZEREL      "${GTEST_DIR}/lib/Release/gtest.lib"
+        INTERFACE_INCLUDE_DIRECTORIES     "${GTEST_DIR}/include"
+    )
+
+    # GTest::gtest_main
+    add_library(GTest::gtest_main STATIC IMPORTED GLOBAL)
+    set_target_properties(GTest::gtest_main PROPERTIES
+        IMPORTED_LOCATION_DEBUG           "${GTEST_DIR}/lib/Debug/gtest_main.lib"
+        IMPORTED_LOCATION_RELEASE         "${GTEST_DIR}/lib/Release/gtest_main.lib"
+        IMPORTED_LOCATION_RELWITHDEBINFO  "${GTEST_DIR}/lib/Release/gtest_main.lib"
+        IMPORTED_LOCATION_MINSIZEREL      "${GTEST_DIR}/lib/Release/gtest_main.lib"
+        INTERFACE_INCLUDE_DIRECTORIES     "${GTEST_DIR}/include"
+        INTERFACE_LINK_LIBRARIES          GTest::gtest
+    )
+
+    # GTest::gmock
+    add_library(GTest::gmock STATIC IMPORTED GLOBAL)
+    set_target_properties(GTest::gmock PROPERTIES
+        IMPORTED_LOCATION_DEBUG           "${GTEST_DIR}/lib/Debug/gmock.lib"
+        IMPORTED_LOCATION_RELEASE         "${GTEST_DIR}/lib/Release/gmock.lib"
+        IMPORTED_LOCATION_RELWITHDEBINFO  "${GTEST_DIR}/lib/Release/gmock.lib"
+        IMPORTED_LOCATION_MINSIZEREL      "${GTEST_DIR}/lib/Release/gmock.lib"
+        INTERFACE_INCLUDE_DIRECTORIES     "${GTEST_DIR}/include"
+        INTERFACE_LINK_LIBRARIES          GTest::gtest
+    )
+
+    # GTest::gmock_main
+    add_library(GTest::gmock_main STATIC IMPORTED GLOBAL)
+    set_target_properties(GTest::gmock_main PROPERTIES
+        IMPORTED_LOCATION_DEBUG           "${GTEST_DIR}/lib/Debug/gmock_main.lib"
+        IMPORTED_LOCATION_RELEASE         "${GTEST_DIR}/lib/Release/gmock_main.lib"
+        IMPORTED_LOCATION_RELWITHDEBINFO  "${GTEST_DIR}/lib/Release/gmock_main.lib"
+        IMPORTED_LOCATION_MINSIZEREL      "${GTEST_DIR}/lib/Release/gmock_main.lib"
+        INTERFACE_INCLUDE_DIRECTORIES     "${GTEST_DIR}/include"
+        INTERFACE_LINK_LIBRARIES          GTest::gmock
+    )
+
+    # =========================================================================
+    # Qt Advanced Docking System (pre-compiled local libraries)
+    # =========================================================================
+    set(QTADS_DIR "${CMAKE_SOURCE_DIR}/third_party/qtads")
+
+    if(NOT EXISTS "${QTADS_DIR}/include/DockManager.h")
+        message(FATAL_ERROR "Pre-compiled QtADS not found at ${QTADS_DIR}. "
+            "Please ensure third_party/qtads contains include/, lib/, and bin/ directories.")
+    endif()
+
+    message(STATUS "Using pre-compiled QtADS (static) from ${QTADS_DIR}")
+
+    add_library(ads::qtadvanceddocking STATIC IMPORTED GLOBAL)
+    set_target_properties(ads::qtadvanceddocking PROPERTIES
+        IMPORTED_LOCATION_DEBUG           "${QTADS_DIR}/lib/Debug/qtadvanceddocking-qt6d_static.lib"
+        IMPORTED_LOCATION_RELEASE         "${QTADS_DIR}/lib/Release/qtadvanceddocking-qt6_static.lib"
+        IMPORTED_LOCATION_RELWITHDEBINFO  "${QTADS_DIR}/lib/Release/qtadvanceddocking-qt6_static.lib"
+        IMPORTED_LOCATION_MINSIZEREL      "${QTADS_DIR}/lib/Release/qtadvanceddocking-qt6_static.lib"
+        INTERFACE_INCLUDE_DIRECTORIES     "${QTADS_DIR}/include"
+        INTERFACE_COMPILE_DEFINITIONS     ADS_STATIC
+    )
+
+    # =========================================================================
+    # fmt v10.1.1
+    # =========================================================================
     find_package(fmt 10.1.1 QUIET)
     if(NOT fmt_FOUND)
         message(STATUS "Fetching fmt v10.1.1...")
@@ -62,9 +115,9 @@ function(fetch_project_dependencies)
         message(STATUS "Found system fmt: ${fmt_VERSION}")
     endif()
 
-    # --- spdlog v1.12.0 ---
-    # https://github.com/gabime/spdlog/releases
-    # Fast C++ logging library
+    # =========================================================================
+    # spdlog v1.12.0
+    # =========================================================================
     find_package(spdlog 1.12.0 QUIET)
     if(NOT spdlog_FOUND)
         message(STATUS "Fetching spdlog v1.12.0...")
@@ -76,6 +129,10 @@ function(fetch_project_dependencies)
         )
         # Don't install spdlog headers/libs into the package
         set(SPDLOG_INSTALL OFF CACHE BOOL "" FORCE)
+        # Use the external fmt library (already fetched above) instead of
+        # spdlog's bundled fmt v9 which triggers C4996 deprecation warnings
+        # on MSVC 17.x (stdext::checked_array_iterator removal).
+        set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "" FORCE)
         FetchContent_MakeAvailable(spdlog)
     else()
         message(STATUS "Found system spdlog: ${spdlog_VERSION}")

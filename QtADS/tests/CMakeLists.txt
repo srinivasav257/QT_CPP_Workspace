@@ -14,7 +14,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")
 # -------------------
 add_executable(UnitTests_GTest tst_gtest_main.cpp)
 target_link_libraries(UnitTests_GTest PRIVATE
-    GTest::gtest_main
+    GTest::gtest
     Qt6::Core
 )
 

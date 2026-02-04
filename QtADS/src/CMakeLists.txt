@@ -13,28 +13,15 @@ set(PROJECT_SOURCES
 # Create the executable target
 add_executable(QtTemplateApp ${PROJECT_SOURCES})
 
-# --- Qt Advanced Docking System (Static Library) ---
-set(QTADS_DIR "${CMAKE_SOURCE_DIR}/third_party/qtads")
-
+# Include directories
 target_include_directories(QtTemplateApp PRIVATE
-    "${QTADS_DIR}/include"
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/panels"
 )
 
-# Since QtADS is a static lib, define ADS_STATIC so ADS_EXPORT resolves to nothing
-target_compile_definitions(QtTemplateApp PRIVATE ADS_STATIC)
-
-# Link the correct QtADS static lib for Debug/Release
+# Link libraries (QtADS + Qt6)
 target_link_libraries(QtTemplateApp PRIVATE
-    "$<$<CONFIG:Debug>:${QTADS_DIR}/lib/debug/qtadvanceddocking-qt6d_static.lib>"
-    "$<$<CONFIG:Release>:${QTADS_DIR}/lib/release/qtadvanceddocking-qt6_static.lib>"
-    "$<$<CONFIG:RelWithDebInfo>:${QTADS_DIR}/lib/release/qtadvanceddocking-qt6_static.lib>"
-    "$<$<CONFIG:MinSizeRel>:${QTADS_DIR}/lib/release/qtadvanceddocking-qt6_static.lib>"
-)
-
-# Link libraries
-target_link_libraries(QtTemplateApp PRIVATE
+    ads::qtadvanceddocking
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets

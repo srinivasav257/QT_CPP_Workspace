@@ -6,3 +6,8 @@ TEST(SimpleQtTest, StringCheck) {
     EXPECT_EQ(str.length(), 5);
     EXPECT_STREQ(str.toUtf8().constData(), "Hello");
 }
+
+int main(int argc, char **argv) {
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
+}
