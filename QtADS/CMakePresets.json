@@ -1,0 +1,296 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "installDir": "${sourceDir}/install/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "ninja-base",
+      "hidden": true,
+      "inherits": "base",
+      "generator": "Ninja"
+    },
+    {
+      "name": "msvc-base",
+      "hidden": true,
+      "inherits": "base",
+      "generator": "Visual Studio 17 2022",
+      "architecture": {
+        "value": "x64",
+        "strategy": "set"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug (Ninja)",
+      "description": "Debug build with Ninja generator",
+      "inherits": "ninja-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release (Ninja)",
+      "description": "Release build with Ninja generator",
+      "inherits": "ninja-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "relwithdebinfo",
+      "displayName": "RelWithDebInfo (Ninja)",
+      "description": "Release with debug info build",
+      "inherits": "ninja-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "msvc-debug",
+      "displayName": "Debug (MSVC)",
+      "description": "Debug build with Visual Studio",
+      "inherits": "msvc-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "msvc-release",
+      "displayName": "Release (MSVC)",
+      "description": "Release build with Visual Studio",
+      "inherits": "msvc-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "sanitizers",
+      "displayName": "Debug with Sanitizers",
+      "description": "Debug build with Address and Leak sanitizers",
+      "inherits": "debug",
+      "cacheVariables": {
+        "ENABLE_SANITIZER_ADDRESS": "ON",
+        "ENABLE_SANITIZER_LEAK": "ON"
+      }
+    },
+    {
+      "name": "coverage",
+      "displayName": "Debug with Coverage",
+      "description": "Debug build with code coverage enabled",
+      "inherits": "debug",
+      "cacheVariables": {
+        "ENABLE_COVERAGE": "ON"
+      }
+    },
+    {
+      "name": "superbuild",
+      "displayName": "SuperBuild Release",
+      "description": "SuperBuild mode - builds dependencies then project",
+      "inherits": "release",
+      "binaryDir": "${sourceDir}/build_superbuild",
+      "cacheVariables": {
+        "ENABLE_SUPERBUILD": "ON"
+      }
+    },
+    {
+      "name": "ci-linux",
+      "displayName": "CI Linux",
+      "description": "CI configuration for Linux",
+      "inherits": "release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "ENABLE_IPO": "ON"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "ci-macos",
+      "displayName": "CI macOS",
+      "description": "CI configuration for macOS",
+      "inherits": "release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "ENABLE_IPO": "ON"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
+    },
+    {
+      "name": "ci-windows",
+      "displayName": "CI Windows",
+      "description": "CI configuration for Windows",
+      "inherits": "msvc-release",
+      "cacheVariables": {
+        "ENABLE_IPO": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    },
+    {
+      "name": "relwithdebinfo",
+      "configurePreset": "relwithdebinfo"
+    },
+    {
+      "name": "msvc-debug",
+      "configurePreset": "msvc-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "msvc-release",
+      "configurePreset": "msvc-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "sanitizers",
+      "configurePreset": "sanitizers"
+    },
+    {
+      "name": "coverage",
+      "configurePreset": "coverage"
+    },
+    {
+      "name": "ci-linux",
+      "configurePreset": "ci-linux"
+    },
+    {
+      "name": "ci-macos",
+      "configurePreset": "ci-macos"
+    },
+    {
+      "name": "ci-windows",
+      "configurePreset": "ci-windows",
+      "configuration": "Release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "default",
+      "configurePreset": "debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "ci",
+      "configurePreset": "release",
+      "output": {
+        "outputOnFailure": true,
+        "verbosity": "verbose"
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "stopOnFailure": false
+      }
+    }
+  ],
+  "packagePresets": [
+    {
+      "name": "default",
+      "configurePreset": "release",
+      "generators": ["ZIP"]
+    },
+    {
+      "name": "windows-installer",
+      "configurePreset": "msvc-release",
+      "generators": ["NSIS", "ZIP"],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "linux-packages",
+      "configurePreset": "release",
+      "generators": ["DEB", "RPM", "TGZ"],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "macos-bundle",
+      "configurePreset": "release",
+      "generators": ["DragNDrop", "ZIP"],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "dev",
+      "displayName": "Development Workflow",
+      "description": "Configure, build, and test in debug mode",
+      "steps": [
+        {"type": "configure", "name": "debug"},
+        {"type": "build", "name": "debug"},
+        {"type": "test", "name": "default"}
+      ]
+    },
+    {
+      "name": "release",
+      "displayName": "Release Workflow",
+      "description": "Full release build with tests and packaging",
+      "steps": [
+        {"type": "configure", "name": "release"},
+        {"type": "build", "name": "release"},
+        {"type": "test", "name": "release"},
+        {"type": "package", "name": "default"}
+      ]
+    },
+    {
+      "name": "ci",
+      "displayName": "CI Workflow",
+      "description": "Continuous integration workflow",
+      "steps": [
+        {"type": "configure", "name": "release"},
+        {"type": "build", "name": "release"},
+        {"type": "test", "name": "ci"}
+      ]
+    }
+  ]
+}

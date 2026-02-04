@@ -1,0 +1,32 @@
+# Doxyfile 1.9.1
+
+PROJECT_NAME           = "@PROJECT_NAME@"
+PROJECT_NUMBER         = "@PROJECT_VERSION@"
+PROJECT_BRIEF          = "Professional CMake Template"
+
+OUTPUT_DIRECTORY       = "@CMAKE_BINARY_DIR@/docs"
+INPUT                  = "@CMAKE_SOURCE_DIR@/src" "@CMAKE_SOURCE_DIR@/README.md"
+RECURSIVE              = YES
+USE_MDFILE_AS_MAINPAGE = "@CMAKE_SOURCE_DIR@/README.md"
+
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+HTML_FILE_EXTENSION    = .html
+
+GENERATE_LATEX         = NO
+
+# Graphviz / Diagrams
+HAVE_DOT               = @DOXYGEN_HAVE_DOT@
+UML_LOOK               = YES
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES
+GRAPHICAL_HIERARCHY    = YES
+DIRECTORY_GRAPH        = YES
+
+# Extraction
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = YES
+EXTRACT_STATIC         = YES
+
+# Warnings
+WARN_IF_UNDOCUMENTED   = NO
