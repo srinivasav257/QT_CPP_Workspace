@@ -1,25 +1,42 @@
-# Auto-detect UI and Resource files
-file(GLOB_RECURSE PROJECT_UIS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.ui")
-# Note: Resources are often shared, so we search in the project root's resources folder
-file(GLOB_RECURSE PROJECT_RESOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/resources/*.qrc")
-
-# Define source files
+# Define source files explicitly for reliable incremental builds
 set(PROJECT_SOURCES
     main.cpp
     MainWindow.cpp
     MainWindow.h
-    ${PROJECT_UIS}
-    ${PROJECT_RESOURCES}
+    PanelRegistry.cpp
+    PanelRegistry.h
+    panels/SamplePanels.cpp
+    panels/SamplePanels.h
+    "${CMAKE_SOURCE_DIR}/resources/resources.qrc"
 )
 
 # Create the executable target
 add_executable(QtTemplateApp ${PROJECT_SOURCES})
 
+# --- Qt Advanced Docking System (Static Library) ---
+set(QTADS_DIR "${CMAKE_SOURCE_DIR}/third_party/qtads")
+
+target_include_directories(QtTemplateApp PRIVATE
+    "${QTADS_DIR}/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/panels"
+)
+
+# Since QtADS is a static lib, define ADS_STATIC so ADS_EXPORT resolves to nothing
+target_compile_definitions(QtTemplateApp PRIVATE ADS_STATIC)
+
+# Link the correct QtADS static lib for Debug/Release
+target_link_libraries(QtTemplateApp PRIVATE
+    "$<$<CONFIG:Debug>:${QTADS_DIR}/lib/debug/qtadvanceddocking-qt6d_static.lib>"
+    "$<$<CONFIG:Release>:${QTADS_DIR}/lib/release/qtadvanceddocking-qt6_static.lib>"
+    "$<$<CONFIG:RelWithDebInfo>:${QTADS_DIR}/lib/release/qtadvanceddocking-qt6_static.lib>"
+    "$<$<CONFIG:MinSizeRel>:${QTADS_DIR}/lib/release/qtadvanceddocking-qt6_static.lib>"
+)
+
 # Link libraries
-# Clean modern target-based linking
-target_link_libraries(QtTemplateApp PRIVATE 
-    Qt6::Core 
-    Qt6::Gui 
+target_link_libraries(QtTemplateApp PRIVATE
+    Qt6::Core
+    Qt6::Gui
     Qt6::Widgets
 )
 
@@ -29,7 +46,7 @@ enable_sanitizers(QtTemplateApp)
 target_include_version(QtTemplateApp)
 
 # Precompiled Headers (Speed up compilation)
-enable_pch(QtTemplateApp HEADERS 
+enable_pch(QtTemplateApp HEADERS
     <QApplication>
     <QMainWindow>
     <QLabel>

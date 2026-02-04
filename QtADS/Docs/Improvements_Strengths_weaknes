@@ -1,0 +1,54 @@
+QtADS Code Review
+Strengths
+Clean architecture with Registry pattern -- PanelRegistry is a well-designed singleton that decouples panel definitions from window construction. Adding new panels requires zero changes to MainWindow.
+
+Two-pass layout algorithm -- MainWindow.cpp:88-144 correctly separates area creation (pass 1) from tab insertion (pass 2), avoiding null area pointers when tabbing subsequent panels.
+
+State persistence done right -- Layout save/restore via QSettings in MainWindow.cpp:251-268 with automatic save on close (MainWindow.cpp:274-278) is good UX. The fallback to setupDefaultLayout() on first run is correct.
+
+Good separation of concerns -- Source files are well-organized: MainWindow owns docking, PanelRegistry owns definitions, SamplePanels owns widget factories. Each has a single responsibility.
+
+Proper CDockManager config ordering -- Flags are set before constructing the dock manager at MainWindow.cpp:53-65, which is a common mistake others make.
+
+CMake is solid -- CONFIGURE_DEPENDS on globs, per-config library selection via generator expressions, PCH support, and static linking with ADS_STATIC are all correctly set up.
+
+Weaknesses
+Fragile menu index hardcoding -- MainWindow.cpp:242 uses menuBar()->actions().at(2) to find the Perspectives menu. If any menu is added/removed/reordered, this silently operates on the wrong menu or crashes with an out-of-bounds access.
+
+No duplicate panel ID protection -- registerPanel() at PanelRegistry.cpp:10-13 silently overwrites if the same ID is registered twice. This can lead to hard-to-diagnose bugs.
+
+Returning copies from hot paths -- panels() returns QList<PanelDefinition> by value (PanelRegistry.h:44), and is called multiple times during setupDefaultLayout() and createMenus(). Each call copies every PanelDefinition including its std::function.
+
+restoreState name shadows QMainWindow::restoreState -- MainWindow.h:28 declares a private restoreState() that hides the base class method. While it works because the private version is what's called, it's confusing and could cause subtle issues if the base version is ever needed.
+
+No error handling on state restore -- MainWindow.cpp:259-268 doesn't check the return value of m_dockManager->restoreState(state). If the saved state is corrupted or from an incompatible version, the window ends up in a broken layout with no fallback.
+
+PanelDefinition relies on implicit sharing -- The struct has no move constructor explicitly defined. The std::function member makes copies expensive. Since definitions are passed by value and stored in a QMap, this generates unnecessary allocations.
+
+No panel ordering guarantee -- QMap sorts by key (the panel ID string), so panels() returns them alphabetically by ID, not by registration order. The layout depends on iteration order, meaning panel arrangement changes if you rename an ID.
+
+Suggested Improvements
+Store the Perspectives menu by pointer instead of index lookup:
+
+Add QMenu* m_perspectiveMenu = nullptr; to the class, assign it in createPerspectiveMenu(), and call m_perspectiveMenu->clear() + repopulate in savePerspective().
+Guard against duplicate IDs -- Either return bool from registerPanel() or assert/log on collision:
+
+
+if (m_panels.contains(def.id)) {
+    qWarning() << "Duplicate panel ID:" << def.id;
+    return;
+}
+Return const QList<PanelDefinition>& from panels(), or cache the values list. Alternatively, expose iterators or a forEach-style API.
+
+Rename restoreState to restoreLayout or restoreDockState to avoid shadowing QMainWindow::restoreState.
+
+Fallback on failed restore -- Check the return value and fall back to default layout:
+
+
+if (!state.isEmpty() && !m_dockManager->restoreState(state))
+    setupDefaultLayout();
+Use QList or std::vector with a separate ID lookup map in PanelRegistry to preserve registration order, which gives predictable layout behavior.
+
+GLOB_RECURSE for sources in CMake -- Currently sources are listed explicitly (good), but .ui and .qrc files use GLOB_RECURSE. Consider listing those explicitly too, since CONFIGURE_DEPENDS has known limitations with some generators and can miss files in certain edge cases.
+
+SamplePanels.cpp font handling -- SamplePanels.cpp:113 hardcodes "Consolas", which is Windows-specific. Use QFontDatabase::systemFont(QFontDatabase::FixedFont) for cross-platform compatibility, or at least specify a fallback family.

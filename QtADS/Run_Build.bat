@@ -50,6 +50,9 @@ echo [INFO] Building Debug (Incremental)...
 cmake -S . -B build %CMAKE_GEN% -DCMAKE_BUILD_TYPE=Debug
 if %errorlevel% neq 0 pause && goto EOF
 cmake --build build --config Debug
+if %errorlevel% neq 0 pause && goto EOF
+echo [INFO] Launching QtTemplateApp (Debug)...
+start "" "build\src\Debug\QtTemplateApp.exe"
 pause
 goto EOF
 
@@ -60,6 +63,9 @@ echo [INFO] Building Release (Incremental)...
 cmake -S . -B build %CMAKE_GEN% -DCMAKE_BUILD_TYPE=Release
 if %errorlevel% neq 0 pause && goto EOF
 cmake --build build --config Release
+if %errorlevel% neq 0 pause && goto EOF
+echo [INFO] Launching QtTemplateApp (Release)...
+start "" "build\src\Release\QtTemplateApp.exe"
 pause
 goto EOF
 
