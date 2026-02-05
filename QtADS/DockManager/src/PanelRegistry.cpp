@@ -2,6 +2,8 @@
 #include <QSet>
 #include <QDebug>
 
+namespace DockManager {
+
 PanelRegistry& PanelRegistry::instance()
 {
     static PanelRegistry reg;
@@ -14,8 +16,41 @@ bool PanelRegistry::registerPanel(const PanelDefinition& def)
         qWarning() << "PanelRegistry: duplicate panel ID ignored:" << def.id;
         return false;
     }
+
+    if (def.id.isEmpty()) {
+        qWarning() << "PanelRegistry: panel ID cannot be empty";
+        return false;
+    }
+
+    if (!def.factory) {
+        qWarning() << "PanelRegistry: panel" << def.id << "has no factory function";
+        return false;
+    }
+
     m_idToIndex.insert(def.id, m_panelList.size());
     m_panelList.append(def);
+    return true;
+}
+
+bool PanelRegistry::registerPanel(PanelDefinition&& def)
+{
+    if (m_idToIndex.contains(def.id)) {
+        qWarning() << "PanelRegistry: duplicate panel ID ignored:" << def.id;
+        return false;
+    }
+
+    if (def.id.isEmpty()) {
+        qWarning() << "PanelRegistry: panel ID cannot be empty";
+        return false;
+    }
+
+    if (!def.factory) {
+        qWarning() << "PanelRegistry: panel" << def.id << "has no factory function";
+        return false;
+    }
+
+    m_idToIndex.insert(def.id, m_panelList.size());
+    m_panelList.append(std::move(def));
     return true;
 }
 
@@ -52,3 +87,21 @@ QList<PanelDefinition> PanelRegistry::panelsInCategory(const QString& category) 
     }
     return result;
 }
+
+bool PanelRegistry::contains(const QString& id) const
+{
+    return m_idToIndex.contains(id);
+}
+
+int PanelRegistry::count() const
+{
+    return m_panelList.size();
+}
+
+void PanelRegistry::clear()
+{
+    m_panelList.clear();
+    m_idToIndex.clear();
+}
+
+} // namespace DockManager

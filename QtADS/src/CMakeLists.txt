@@ -1,10 +1,6 @@
-# Define source files explicitly for reliable incremental builds
+# Application source files - panels only, DockManager provides the framework
 set(PROJECT_SOURCES
     main.cpp
-    MainWindow.cpp
-    MainWindow.h
-    PanelRegistry.cpp
-    PanelRegistry.h
     panels/SamplePanels.cpp
     panels/SamplePanels.h
     "${CMAKE_SOURCE_DIR}/resources/resources.qrc"
@@ -13,17 +9,15 @@ set(PROJECT_SOURCES
 # Create the executable target
 add_executable(QtTemplateApp ${PROJECT_SOURCES})
 
-# Include directories
+# Include directories for application-specific panels
 target_include_directories(QtTemplateApp PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/panels"
 )
 
-# Link libraries (QtADS + Qt6)
+# Link DockManager - it brings in qtads and Qt dependencies automatically
 target_link_libraries(QtTemplateApp PRIVATE
-    ads::qtadvanceddocking
-    Qt6::Core
-    Qt6::Gui
+    DockManager::DockManager
     Qt6::Widgets
 )
 

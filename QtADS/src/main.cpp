@@ -1,4 +1,4 @@
-#include "MainWindow.h"
+#include <DockFramework.h>
 #include "SamplePanels.h"
 #include <QApplication>
 
@@ -14,7 +14,9 @@ int main(int argc, char *argv[])
     // Register all panel types before creating the window
     registerSamplePanels();
 
-    MainWindow window;
+    // Create and show the dock main window
+    DockManager::DockMainWindow window;
+    window.setWindowTitle("QtADS Master Template");
     window.show();
 
     return app.exec();
