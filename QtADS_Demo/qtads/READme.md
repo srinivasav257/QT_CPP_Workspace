@@ -322,3 +322,198 @@ MSBuild version 17.14.23+b0019275e for .NET Framework
   Building Custom Rule C:/QT_Workspace/Qt_practice/Libraries/Qt-Advanced-Docking-System/CMakeLists.txt
 
 C:\QT_Workspace\Qt_practice\Libraries\Qt-Advanced-Docking-System\build>
+
+================================================== .a library ==========================================================
+
+Setting up environment for Qt usage...
+Remember to call vcvarsall.bat to complete environment setup!
+
+C:\Qt\6.8.3\msvc2022_64>cd C:\QT_Workspace\Qt_practice\Libraries\Qt-Advanced-Docking-System\build-debug
+
+C:\QT_Workspace\Qt_practice\Libraries\Qt-Advanced-Docking-System\build-debug>cmake -G "Ninja" ^
+More?   -DBUILD_EXAMPLES=OFF ^
+More?   -DBUILD_STATIC=ON ^
+More?   -DCMAKE_BUILD_TYPE=Debug ^
+More?   -DCMAKE_PREFIX_PATH="C:/Qt/6.8.3/msvc2022_64" ^
+More?   -DCMAKE_INSTALL_PREFIX=../debug ^
+More?   ..
+-- The CXX compiler identification is GNU 14.2.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: C:/msys64/mingw64/bin/c++.exe - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Performing Test HAVE_STDATOMIC
+-- Performing Test HAVE_STDATOMIC - Success
+-- Found WrapAtomic: TRUE
+-- Could NOT find WrapVulkanHeaders (missing: Vulkan_INCLUDE_DIR)
+-- Configuring done (3.6s)
+-- Generating done (0.2s)
+-- Build files have been written to: C:/QT_Workspace/Qt_practice/Libraries/Qt-Advanced-Docking-System/build-debug
+
+C:\QT_Workspace\Qt_practice\Libraries\Qt-Advanced-Docking-System\build-debug>cmake --build .
+[27/27] Linking CXX static library x64\lib\libqtadvanceddocking-qt6d_static.a
+
+C:\QT_Workspace\Qt_practice\Libraries\Qt-Advanced-Docking-System\build-debug>cd ..
+
+C:\QT_Workspace\Qt_practice\Libraries\Qt-Advanced-Docking-System>cd build-release
+
+C:\QT_Workspace\Qt_practice\Libraries\Qt-Advanced-Docking-System\build-release>cmake -G "Ninja" ^
+More?   -DBUILD_EXAMPLES=OFF ^
+More?   -DBUILD_STATIC=ON ^
+More?   -DCMAKE_BUILD_TYPE=Release ^
+More?   -DCMAKE_PREFIX_PATH="C:/Qt/6.8.3/msvc2022_64" ^
+More?   -DCMAKE_INSTALL_PREFIX=../release ^
+More?   ..
+-- The CXX compiler identification is GNU 14.2.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: C:/msys64/mingw64/bin/c++.exe - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Performing Test HAVE_STDATOMIC
+-- Performing Test HAVE_STDATOMIC - Success
+-- Found WrapAtomic: TRUE
+-- Could NOT find WrapVulkanHeaders (missing: Vulkan_INCLUDE_DIR)
+-- Configuring done (4.5s)
+-- Generating done (0.2s)
+-- Build files have been written to: C:/QT_Workspace/Qt_practice/Libraries/Qt-Advanced-Docking-System/build-release
+
+C:\QT_Workspace\Qt_practice\Libraries\Qt-Advanced-Docking-System\build-release>cmake --build .
+[27/27] Linking CXX static library x64\lib\libqtadvanceddocking-qt6_static.a
+
+C:\QT_Workspace\Qt_practice\Libraries\Qt-Advanced-Docking-System\build-release>
+
+
+================================================== .lib library ==========================================================
+
+
+
+Setting up environment for Qt usage...
+Remember to call vcvarsall.bat to complete environment setup!
+
+C:\Qt\6.8.3\msvc2022_64>cd C:\QT_Workspace\Qt_practice\Libraries\Qt-Advanced-Docking-System\build-debug
+
+C:\QT_Workspace\Qt_practice\Libraries\Qt-Advanced-Docking-System\build-debug>cmake -G "Visual Studio 17 2022" -A x64 ^
+More?   -DBUILD_STATIC=ON ^
+More?   -DBUILD_EXAMPLES=OFF ^
+More?   -DCMAKE_BUILD_TYPE=Debug ^
+More?   -DCMAKE_PREFIX_PATH="C:/Qt/6.8.3/msvc2022_64" ^
+More?   ..
+-- The CXX compiler identification is MSVC 19.44.35217.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
+-- Looking for pthread_create in pthreads
+-- Looking for pthread_create in pthreads - not found
+-- Looking for pthread_create in pthread
+-- Looking for pthread_create in pthread - not found
+-- Found Threads: TRUE
+-- Performing Test HAVE_STDATOMIC
+-- Performing Test HAVE_STDATOMIC - Success
+-- Found WrapAtomic: TRUE
+-- Could NOT find WrapVulkanHeaders (missing: Vulkan_INCLUDE_DIR)
+-- Configuring done (6.6s)
+-- Generating done (0.3s)
+CMake Warning:
+  Manually-specified variables were not used by the project:
+
+    CMAKE_BUILD_TYPE
+
+
+-- Build files have been written to: C:/QT_Workspace/Qt_practice/Libraries/Qt-Advanced-Docking-System/build-debug
+
+C:\QT_Workspace\Qt_practice\Libraries\Qt-Advanced-Docking-System\build-debug>cmake --build . --config Debug
+MSBuild version 17.14.23+b0019275e for .NET Framework
+
+  1>Checking Build System
+  Automatic MOC for target qtadvanceddocking-qt6
+  1>Automatic RCC for ads.qrc
+  Building Custom Rule C:/QT_Workspace/Qt_practice/Libraries/Qt-Advanced-Docking-System/src/CMakeLists.txt
+  mocs_compilation_Debug.cpp
+  ads_globals.cpp
+  DockAreaTabBar.cpp
+  DockAreaTitleBar.cpp
+  DockAreaWidget.cpp
+  DockContainerWidget.cpp
+  DockManager.cpp
+  DockOverlay.cpp
+  DockSplitter.cpp
+  DockWidget.cpp
+  DockWidgetTab.cpp
+  DockingStateReader.cpp
+  DockFocusController.cpp
+  ElidingLabel.cpp
+  FloatingDockContainer.cpp
+  FloatingDragPreview.cpp
+  IconProvider.cpp
+  DockComponentsFactory.cpp
+  AutoHideSideBar.cpp
+  AutoHideTab.cpp
+  Generating Code...
+  Compiling...
+  AutoHideDockContainer.cpp
+  PushButton.cpp
+  ResizeHandle.cpp
+  Generating Code...
+  qrc_ads.cpp
+  qtadvanceddocking-qt6.vcxproj -> C:\QT_Workspace\Qt_practice\Libraries\Qt-Advanced-Docking-System\build-debug\x64\lib\Debug\qtadvanceddocking-qt6d_static
+  .lib
+  Building Custom Rule C:/QT_Workspace/Qt_practice/Libraries/Qt-Advanced-Docking-System/CMakeLists.txt
+
+C:\QT_Workspace\Qt_practice\Libraries\Qt-Advanced-Docking-System\build-debug>
+
+
+-- Build files have been written to: C:/QT_Workspace/Qt_practice/Libraries/Qt-Advanced-Docking-System/build-release
+
+C:\QT_Workspace\Qt_practice\Libraries\Qt-Advanced-Docking-System\build-release>cmake --build . --config Release
+MSBuild version 17.14.23+b0019275e for .NET Framework
+
+  1>Checking Build System
+  Automatic MOC for target qtadvanceddocking-qt6
+  1>Automatic RCC for ads.qrc
+  Building Custom Rule C:/QT_Workspace/Qt_practice/Libraries/Qt-Advanced-Docking-System/src/CMakeLists.txt
+  ads_globals.cpp
+  DockAreaTabBar.cpp
+  DockAreaTitleBar.cpp
+  DockAreaWidget.cpp
+  DockContainerWidget.cpp
+  DockManager.cpp
+  DockOverlay.cpp
+  DockSplitter.cpp
+  DockWidget.cpp
+  DockWidgetTab.cpp
+  DockingStateReader.cpp
+  DockFocusController.cpp
+  ElidingLabel.cpp
+  FloatingDockContainer.cpp
+  FloatingDragPreview.cpp
+  IconProvider.cpp
+  DockComponentsFactory.cpp
+  AutoHideSideBar.cpp
+  AutoHideTab.cpp
+  AutoHideDockContainer.cpp
+  Generating Code...
+  Compiling...
+  PushButton.cpp
+  ResizeHandle.cpp
+  mocs_compilation_Release.cpp
+  Generating Code...
+  qrc_ads.cpp
+  qtadvanceddocking-qt6.vcxproj -> C:\QT_Workspace\Qt_practice\Libraries\Qt-Advanced-Docking-System\build-release\x64\lib\Release\qtadvanceddocking-qt6_sta
+  tic.lib
+  Building Custom Rule C:/QT_Workspace/Qt_practice/Libraries/Qt-Advanced-Docking-System/CMakeLists.txt
+
+C:\QT_Workspace\Qt_practice\Libraries\Qt-Advanced-Docking-System\build-release>
+
+
