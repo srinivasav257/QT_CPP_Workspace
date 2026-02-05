@@ -1,3 +1,6 @@
+# DockManager library
+add_subdirectory(DockManager)
+
 # Application source files - panels only, DockManager provides the framework
 set(PROJECT_SOURCES
     main.cpp

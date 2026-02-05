@@ -61,7 +61,6 @@ fetch_project_dependencies()
 # add_compile_definitions(QT_DISABLE_DEPRECATED_BEFORE=0x060000)
 
 # --- Subdirectories ---
-add_subdirectory(DockManager)
 add_subdirectory(src)
 add_subdirectory(tests)
 
