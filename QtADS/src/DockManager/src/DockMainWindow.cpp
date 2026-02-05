@@ -274,6 +274,11 @@ void DockMainWindow::createToolBar()
 {
     d->dockToolBar = new DockToolBar(d->workspaceManager, this);
     addToolBar(d->dockToolBar);
+
+    // Hide all toolbar items - layout options available in menu only
+    d->dockToolBar->setSaveRestoreVisible(false);
+    d->dockToolBar->setPerspectivesVisible(false);
+    d->dockToolBar->setLockVisible(false);
 }
 
 void DockMainWindow::initializeComplete()
