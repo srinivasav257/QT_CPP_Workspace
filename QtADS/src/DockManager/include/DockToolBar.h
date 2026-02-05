@@ -4,7 +4,6 @@
 #include <QScopedPointer>
 
 class QAction;
-class QComboBox;
 
 namespace DockManager {
 
@@ -76,20 +75,8 @@ public:
      */
     QAction* createPerspectiveAction() const;
 
-    /**
-     * @brief Get the perspective selection combo box
-     */
-    QComboBox* perspectiveComboBox() const;
-
-public slots:
-    /**
-     * @brief Refresh the perspective list in the combo box
-     */
-    void updatePerspectiveList();
-
 private slots:
     void onCreatePerspective();
-    void onPerspectiveSelected(int index);
     void onLockedChanged(bool locked);
 
 private:

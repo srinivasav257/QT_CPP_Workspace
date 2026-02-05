@@ -2,9 +2,7 @@
 #include "WorkspaceManager.h"
 
 #include <QAction>
-#include <QComboBox>
 #include <QInputDialog>
-#include <QIcon>
 
 namespace DockManager {
 
@@ -16,7 +14,6 @@ struct DockToolBar::Private
     QAction* restoreAction = nullptr;
     QAction* lockAction = nullptr;
     QAction* createPerspectiveAction = nullptr;
-    QComboBox* perspectiveCombo = nullptr;
 };
 
 DockToolBar::DockToolBar(WorkspaceManager* workspaceManager, QWidget* parent)
@@ -45,14 +42,6 @@ DockToolBar::DockToolBar(WorkspaceManager* workspaceManager, QWidget* parent)
     addSeparator();
 
     // --- Perspective Controls ---
-    d->perspectiveCombo = new QComboBox(this);
-    d->perspectiveCombo->setToolTip("Select a perspective");
-    d->perspectiveCombo->setMinimumWidth(120);
-    addWidget(d->perspectiveCombo);
-
-    connect(d->perspectiveCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &DockToolBar::onPerspectiveSelected);
-
     d->createPerspectiveAction = addAction("+");
     d->createPerspectiveAction->setToolTip("Save current layout as a new perspective");
     connect(d->createPerspectiveAction, &QAction::triggered,
@@ -73,21 +62,7 @@ DockToolBar::DockToolBar(WorkspaceManager* workspaceManager, QWidget* parent)
     if (d->workspaceManager) {
         connect(d->workspaceManager, &WorkspaceManager::lockedChanged,
                 this, &DockToolBar::onLockedChanged);
-        connect(d->workspaceManager, &WorkspaceManager::perspectiveSaved,
-                this, &DockToolBar::updatePerspectiveList);
-        connect(d->workspaceManager, &WorkspaceManager::perspectiveChanged,
-                this, [this](const QString& name) {
-                    int index = d->perspectiveCombo->findText(name);
-                    if (index >= 0) {
-                        d->perspectiveCombo->blockSignals(true);
-                        d->perspectiveCombo->setCurrentIndex(index);
-                        d->perspectiveCombo->blockSignals(false);
-                    }
-                });
     }
-
-    // Initial perspective list
-    updatePerspectiveList();
 }
 
 DockToolBar::~DockToolBar() = default;
@@ -102,7 +77,6 @@ void DockToolBar::setSaveRestoreVisible(bool visible)
 
 void DockToolBar::setPerspectivesVisible(bool visible)
 {
-    d->perspectiveCombo->setVisible(visible);
     d->createPerspectiveAction->setVisible(visible);
 }
 
@@ -133,29 +107,7 @@ QAction* DockToolBar::createPerspectiveAction() const
     return d->createPerspectiveAction;
 }
 
-QComboBox* DockToolBar::perspectiveComboBox() const
-{
-    return d->perspectiveCombo;
-}
-
 // --- Slots ---
-
-void DockToolBar::updatePerspectiveList()
-{
-    if (!d->workspaceManager)
-        return;
-
-    d->perspectiveCombo->blockSignals(true);
-    QString current = d->perspectiveCombo->currentText();
-    d->perspectiveCombo->clear();
-    d->perspectiveCombo->addItems(d->workspaceManager->perspectiveNames());
-
-    int index = d->perspectiveCombo->findText(current);
-    if (index >= 0)
-        d->perspectiveCombo->setCurrentIndex(index);
-
-    d->perspectiveCombo->blockSignals(false);
-}
 
 void DockToolBar::onCreatePerspective()
 {
@@ -174,15 +126,6 @@ void DockToolBar::onCreatePerspective()
     if (ok && !name.isEmpty()) {
         d->workspaceManager->savePerspective(name);
     }
-}
-
-void DockToolBar::onPerspectiveSelected(int index)
-{
-    if (!d->workspaceManager || index < 0)
-        return;
-
-    QString name = d->perspectiveCombo->itemText(index);
-    d->workspaceManager->loadPerspective(name);
 }
 
 void DockToolBar::onLockedChanged(bool locked)

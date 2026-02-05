@@ -52,8 +52,13 @@ DockMainWindow::DockMainWindow(QWidget* parent)
     createToolBar();
     setupDefaultLayout();
 
-    // Save default layout as "Default" perspective
-    d->workspaceManager->savePerspective("Default");
+    // Load saved perspectives FIRST (before saving Default)
+    d->workspaceManager->loadPerspectives();
+
+    // Save default layout as "Default" perspective (only if not already present)
+    if (!d->workspaceManager->perspectiveNames().contains("Default")) {
+        d->workspaceManager->savePerspective("Default");
+    }
 
     // Try to restore previous session
     auto savedGeometry = d->workspaceManager->savedGeometry();
@@ -61,7 +66,6 @@ DockMainWindow::DockMainWindow(QWidget* parent)
         restoreGeometry(savedGeometry);
     }
 
-    d->workspaceManager->loadPerspectives();
     d->workspaceManager->restoreState();
 
     // Update perspective menu
