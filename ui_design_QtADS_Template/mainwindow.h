@@ -8,6 +8,11 @@ class QEvent;
 class QToolButton;
 class QWidget;
 
+namespace ads
+{
+class CDockManager;
+}
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -21,9 +26,12 @@ protected:
 
 private:
     void toggleMaximizeRestore();
+    void setupDockingArea(QWidget *editorArea);
+    QWidget *createWelcomeWidget() const;
 
     QWidget *m_dragRegion = nullptr;
     QToolButton *m_maximizeButton = nullptr;
+    ads::CDockManager *m_dockManager = nullptr;
     bool m_dragActive = false;
     QPoint m_dragOffset;
 };

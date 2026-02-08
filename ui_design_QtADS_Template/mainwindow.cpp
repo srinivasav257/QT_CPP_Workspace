@@ -1,14 +1,22 @@
 #include "mainwindow.h"
 
+#include "DockAreaWidget.h"
+#include "DockManager.h"
+#include "DockWidget.h"
+
 #include <QAbstractButton>
 #include <QEvent>
+#include <QHeaderView>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QListWidget>
 #include <QLineEdit>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QPlainTextEdit>
 #include <QToolButton>
+#include <QTreeWidget>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -250,35 +258,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     auto *editorArea = new QWidget();
     editorArea->setObjectName("editorArea");
-
-    auto *editorLayout = new QVBoxLayout(editorArea);
-    editorLayout->setContentsMargins(0, 0, 0, 0);
-    editorLayout->setSpacing(0);
-
-    auto *welcome = new QWidget();
-    auto *welcomeLayout = new QVBoxLayout(welcome);
-    welcomeLayout->setContentsMargins(0, 0, 0, 40);
-    welcomeLayout->setSpacing(12);
-    welcomeLayout->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
-
-    welcomeLayout->addWidget(new VsWatermark(), 0, Qt::AlignHCenter);
-
-    auto *shortcuts = new QWidget();
-    auto *shortcutsLayout = new QVBoxLayout(shortcuts);
-    shortcutsLayout->setContentsMargins(0, 0, 0, 0);
-    shortcutsLayout->setSpacing(10);
-
-    shortcutsLayout->addWidget(makeShortcutRow("Open Chat", {"Ctrl", "Alt", "I"}));
-    shortcutsLayout->addWidget(makeShortcutRow("Show All Commands", {"Ctrl", "Shift", "P"}));
-    shortcutsLayout->addWidget(makeShortcutRow("Open File", {"Ctrl", "O"}));
-    shortcutsLayout->addWidget(makeShortcutRow("Open Folder", {"Ctrl", "K"}, {"Ctrl", "O"}));
-    shortcutsLayout->addWidget(makeShortcutRow("Open Recent", {"Ctrl", "R"}));
-
-    welcomeLayout->addWidget(shortcuts, 0, Qt::AlignHCenter);
-
-    editorLayout->addStretch();
-    editorLayout->addWidget(welcome, 0, Qt::AlignHCenter);
-    editorLayout->addStretch();
+    setupDockingArea(editorArea);
 
     contentLayout->addWidget(editorArea);
 
@@ -432,6 +412,57 @@ MainWindow::MainWindow(QWidget *parent)
             background: #f4f4f8;
         }
 
+        ads--CDockManager,
+        ads--CDockContainerWidget,
+        ads--CDockAreaWidget {
+            background: #f4f4f8;
+        }
+
+        ads--CDockAreaTitleBar {
+            background: #ececf3;
+            border-bottom: 1px solid #d8d8e5;
+            min-height: 28px;
+        }
+
+        ads--CDockWidgetTab {
+            background: #ececf3;
+            border-right: 1px solid #d8d8e5;
+            padding: 4px 8px;
+        }
+
+        ads--CDockWidgetTab[activeTab="true"] {
+            background: #f4f4f8;
+        }
+
+        ads--CDockWidget {
+            background: #f8f8fb;
+            border: 1px solid #dedee8;
+            border-top: none;
+        }
+
+        QListWidget#panelList,
+        QWidget#panelWidget,
+        QTreeWidget#problemsTree,
+        QPlainTextEdit#terminalView {
+            background: #ffffff;
+            border: none;
+            color: #434852;
+            font: 9.5pt "Segoe UI";
+        }
+
+        QLineEdit {
+            background: #ffffff;
+            border: 1px solid #d0d3db;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font: 9.5pt "Segoe UI";
+            color: #434852;
+        }
+
+        QTreeWidget#problemsTree::item {
+            padding: 2px 4px;
+        }
+
         QLabel#shortcutLabel {
             color: #5a5f69;
             font: 10.5pt "Segoe UI";
@@ -465,6 +496,118 @@ MainWindow::MainWindow(QWidget *parent)
 }
 
 MainWindow::~MainWindow() {}
+
+QWidget *MainWindow::createWelcomeWidget() const
+{
+    auto *welcome = new QWidget();
+    auto *welcomeLayout = new QVBoxLayout(welcome);
+    welcomeLayout->setContentsMargins(0, 0, 0, 40);
+    welcomeLayout->setSpacing(12);
+    welcomeLayout->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
+
+    welcomeLayout->addWidget(new VsWatermark(), 0, Qt::AlignHCenter);
+
+    auto *shortcuts = new QWidget();
+    auto *shortcutsLayout = new QVBoxLayout(shortcuts);
+    shortcutsLayout->setContentsMargins(0, 0, 0, 0);
+    shortcutsLayout->setSpacing(10);
+
+    shortcutsLayout->addWidget(makeShortcutRow("Open Chat", {"Ctrl", "Alt", "I"}));
+    shortcutsLayout->addWidget(makeShortcutRow("Show All Commands", {"Ctrl", "Shift", "P"}));
+    shortcutsLayout->addWidget(makeShortcutRow("Open File", {"Ctrl", "O"}));
+    shortcutsLayout->addWidget(makeShortcutRow("Open Folder", {"Ctrl", "K"}, {"Ctrl", "O"}));
+    shortcutsLayout->addWidget(makeShortcutRow("Open Recent", {"Ctrl", "R"}));
+
+    welcomeLayout->addWidget(shortcuts, 0, Qt::AlignHCenter);
+
+    return welcome;
+}
+
+void MainWindow::setupDockingArea(QWidget *editorArea)
+{
+    ads::CDockManager::setConfigFlags(ads::CDockManager::DefaultOpaqueConfig);
+    ads::CDockManager::setConfigFlag(ads::CDockManager::FocusHighlighting, true);
+    ads::CDockManager::setConfigFlag(ads::CDockManager::DockAreaHasTabsMenuButton, true);
+    ads::CDockManager::setConfigFlag(ads::CDockManager::DockAreaHasUndockButton, true);
+    ads::CDockManager::setConfigFlag(ads::CDockManager::AlwaysShowTabs, true);
+    ads::CDockManager::setConfigFlag(ads::CDockManager::EqualSplitOnInsertion, true);
+    ads::CDockManager::setAutoHideConfigFlags(ads::CDockManager::DefaultAutoHideConfig);
+
+    auto *editorLayout = new QVBoxLayout(editorArea);
+    editorLayout->setContentsMargins(0, 0, 0, 0);
+    editorLayout->setSpacing(0);
+
+    m_dockManager = new ads::CDockManager(editorArea);
+    editorLayout->addWidget(m_dockManager);
+
+    auto *welcomeDock = new ads::CDockWidget(m_dockManager, "Welcome");
+    welcomeDock->setWidget(createWelcomeWidget(), ads::CDockWidget::ForceNoScrollArea);
+    welcomeDock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
+    welcomeDock->setFeature(ads::CDockWidget::DockWidgetMovable, false);
+    welcomeDock->setFeature(ads::CDockWidget::DockWidgetFloatable, false);
+    m_dockManager->addDockWidget(ads::CenterDockWidgetArea, welcomeDock);
+
+    auto *explorerList = new QListWidget();
+    explorerList->setObjectName("panelList");
+    explorerList->addItems({"project", "src", "include", "CMakeLists.txt", "README.md"});
+
+    auto *explorerDock = new ads::CDockWidget(m_dockManager, "Explorer");
+    explorerDock->setWidget(explorerList, ads::CDockWidget::ForceNoScrollArea);
+    auto *leftArea = m_dockManager->addDockWidget(ads::LeftDockWidgetArea, explorerDock);
+
+    auto *searchPanel = new QWidget();
+    searchPanel->setObjectName("panelWidget");
+    auto *searchLayout = new QVBoxLayout(searchPanel);
+    searchLayout->setContentsMargins(8, 8, 8, 8);
+    searchLayout->setSpacing(8);
+
+    auto *searchInput = new QLineEdit();
+    searchInput->setPlaceholderText("Search project files");
+    searchLayout->addWidget(searchInput);
+
+    auto *searchResults = new QListWidget();
+    searchResults->setObjectName("panelList");
+    searchResults->addItems({"mainwindow.cpp", "mainwindow.h", "main.cpp", "CMakeLists.txt"});
+    searchLayout->addWidget(searchResults);
+
+    auto *searchDock = new ads::CDockWidget(m_dockManager, "Search");
+    searchDock->setWidget(searchPanel, ads::CDockWidget::ForceNoScrollArea);
+    m_dockManager->addDockWidgetTabToArea(searchDock, leftArea);
+
+    auto *outlineList = new QListWidget();
+    outlineList->setObjectName("panelList");
+    outlineList->addItems({"MainWindow", "createWelcomeWidget", "setupDockingArea", "eventFilter"});
+
+    auto *outlineDock = new ads::CDockWidget(m_dockManager, "Outline");
+    outlineDock->setWidget(outlineList, ads::CDockWidget::ForceNoScrollArea);
+    m_dockManager->addDockWidget(ads::RightDockWidgetArea, outlineDock);
+
+    auto *problemsView = new QTreeWidget();
+    problemsView->setObjectName("problemsTree");
+    problemsView->setColumnCount(3);
+    problemsView->setRootIsDecorated(false);
+    problemsView->setAlternatingRowColors(true);
+    problemsView->setHeaderLabels({"File", "Line", "Message"});
+    problemsView->header()->setStretchLastSection(true);
+
+    auto *issueA = new QTreeWidgetItem({"mainwindow.cpp", "221", "Dummy warning: unused include"});
+    auto *issueB = new QTreeWidgetItem({"CMakeLists.txt", "47", "Dummy note: release profile"});
+    problemsView->addTopLevelItem(issueA);
+    problemsView->addTopLevelItem(issueB);
+
+    auto *problemsDock = new ads::CDockWidget(m_dockManager, "Problems");
+    problemsDock->setWidget(problemsView, ads::CDockWidget::ForceNoScrollArea);
+    auto *bottomArea = m_dockManager->addDockWidget(ads::BottomDockWidgetArea, problemsDock);
+
+    auto *terminalView = new QPlainTextEdit();
+    terminalView->setObjectName("terminalView");
+    terminalView->setReadOnly(true);
+    terminalView->setPlainText("PS C:\\workspace> cmake --build .\nBuild completed (dummy output)\n");
+
+    auto *terminalDock = new ads::CDockWidget(m_dockManager, "Terminal");
+    terminalDock->setWidget(terminalView, ads::CDockWidget::ForceNoScrollArea);
+    m_dockManager->addDockWidgetTabToArea(terminalDock, bottomArea);
+}
 
 bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 {
