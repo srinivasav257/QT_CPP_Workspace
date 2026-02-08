@@ -10,6 +10,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
+add_subdirectory(lib/ide_shell)
 
 set(QTADS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/qtads")
 set(QTADS_LIB_DEBUG "${QTADS_DIR}/lib/Debug/qtadvanceddocking-qt6d_static.lib")
@@ -58,6 +59,7 @@ target_compile_definitions(ui_design_QtADS_Template PRIVATE ADS_STATIC)
 target_link_libraries(ui_design_QtADS_Template PRIVATE
     Qt6::Widgets
     qtadvanceddocking
+    IdeShell::IdeShell
 )
 
 set_target_properties(ui_design_QtADS_Template PROPERTIES

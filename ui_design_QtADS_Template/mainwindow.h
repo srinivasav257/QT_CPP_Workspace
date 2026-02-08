@@ -1,38 +1,25 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include <QMainWindow>
-#include <QPoint>
-
-class QEvent;
-class QToolButton;
-class QWidget;
+#include <IdeShell/IdeShellWindow.h>
 
 namespace ads
 {
 class CDockManager;
 }
 
-class MainWindow : public QMainWindow
+class MainWindow : public ide_shell::IdeShellWindow
 {
     Q_OBJECT
 
 public:
-    MainWindow(QWidget *parent = nullptr);
-    ~MainWindow();
-
-protected:
-    bool eventFilter(QObject *watched, QEvent *event) override;
+    explicit MainWindow(QWidget *parent = nullptr);
+    ~MainWindow() override;
 
 private:
-    void toggleMaximizeRestore();
-    void setupDockingArea(QWidget *editorArea);
-    QWidget *createWelcomeWidget() const;
+    void setupDockingArea();
 
-    QWidget *m_dragRegion = nullptr;
-    QToolButton *m_maximizeButton = nullptr;
     ads::CDockManager *m_dockManager = nullptr;
-    bool m_dragActive = false;
-    QPoint m_dragOffset;
 };
+
 #endif // MAINWINDOW_H
